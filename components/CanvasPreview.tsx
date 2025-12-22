@@ -20,13 +20,18 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
-    // Helper to bypass CORS issues for any external image
-    const getProxiedUrl = (url: string) => {
-      if (!url) return '';
-      // If it's already a data URL or local, don't proxy
-      if (url.startsWith('data:') || url.startsWith('blob:') || url.includes(window.location.host)) return url;
-      // Use a public CORS proxy for external assets to prevent tainted canvas
-      return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    /**
+     * Generates proxy URLs using various providers to bypass different types of blocks.
+     */
+    const getProxyTier = (url: string, tier: number) => {
+      const cleanUrl = encodeURIComponent(url);
+      const cb = `&cb=${Date.now()}`;
+      switch (tier) {
+        case 0: return `https://wsrv.nl/?url=${cleanUrl}${cb}&output=png`; // Tier 0: Dedicated Image CDN
+        case 1: return `https://corsproxy.io/?${url}`; // Tier 1: Generic CORS Proxy (Excellent for WP)
+        case 2: return `https://api.allorigins.win/raw?url=${cleanUrl}`; // Tier 2: Raw data proxy
+        default: return url;
+      }
     };
 
     const renderDefaultLogo = (context: CanvasRenderingContext2D) => {
@@ -45,38 +50,71 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
       }
     };
 
+    /**
+     * Highly resilient loader that tries multiple proxies and loading methods.
+     */
+    const loadImageResilient = async (url: string): Promise<HTMLImageElement> => {
+      const maxTiers = 4;
+      
+      for (let tier = 0; tier < maxTiers; tier++) {
+        try {
+          const src = getProxyTier(url, tier);
+          
+          // For Tier 1 and 2, try Fetch-to-Blob first as it's more robust
+          if (tier === 1 || tier === 2) {
+            try {
+              const response = await fetch(src);
+              if (!response.ok) throw new Error('Fetch failed');
+              const blob = await response.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              return await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = blobUrl;
+              });
+            } catch (e) {
+              console.warn(`Fetch method failed for tier ${tier}, falling back to direct img.src`);
+            }
+          }
+
+          // Standard img.src loading
+          const result = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error(`Tier ${tier} failed`));
+            img.src = src;
+            // Timeout individual tier
+            setTimeout(() => reject(new Error('Timeout')), 6000);
+          });
+          return result;
+        } catch (err) {
+          console.warn(`Resilient Load: Tier ${tier} failed for ${url}`);
+          continue;
+        }
+      }
+      throw new Error(`All loading tiers failed for: ${url}`);
+    };
+
     const render = async () => {
       const config = TEMPLATE_CONFIGS[template] as any;
-      
-      // 1. Draw Background Image (Using proxy to avoid tainting)
-      const img = new Image();
-      // Even with proxy, setting crossOrigin is good practice
-      img.crossOrigin = "anonymous";
-      img.src = getProxiedUrl(post.featuredImageUrl);
-      
-      try {
-        await new Promise((resolve, reject) => { 
-          img.onload = resolve; 
-          img.onerror = reject;
-          setTimeout(() => reject(new Error("BG Timeout")), 8000);
-        });
-      } catch (e) {
-        console.warn("Background image failed even with proxy. Using fallback color.");
-      }
-      
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (img.complete && img.naturalWidth > 0) {
-        const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
-        const x = (canvas.width / 2) - (img.width / 2) * scale;
-        const y = (canvas.height / 2) - (img.height / 2) * scale;
-        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-      } else {
+      // 1. Draw Background Image
+      try {
+        const bgImg = await loadImageResilient(post.featuredImageUrl);
+        const scale = Math.max(canvas.width / bgImg.width, canvas.height / bgImg.height);
+        const x = (canvas.width / 2) - (bgImg.width / 2) * scale;
+        const y = (canvas.height / 2) - (bgImg.height / 2) * scale;
+        ctx.drawImage(bgImg, x, y, bgImg.width * scale, bgImg.height * scale);
+      } catch (e) {
+        console.warn("Background failed. Using fallback.", e);
         ctx.fillStyle = template === TemplateType.MINIMALIST ? '#0f172a' : '#111827';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      // 2. Main Layout Content
+      // 2. Main Layout Content (Templates)
       if (template === TemplateType.MODERN_NEWS) {
         const margin = 35;
         const boxWidth = canvas.width - (margin * 2);
@@ -210,19 +248,48 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         });
       }
 
-      // 3. Logo placement with Proxy Bypass Logic
+      // 3. Logo placement
       if (logoUrl && logoUrl.trim() !== "") {
         try {
-          const logo = new Image();
-          logo.crossOrigin = "anonymous";
-          logo.src = getProxiedUrl(logoUrl);
-          
-          await new Promise((resolve, reject) => { 
-            logo.onload = resolve; 
-            logo.onerror = reject;
-            setTimeout(() => reject(new Error("Logo Timeout")), 5000);
-          });
-
+          const logo = await loadImageResilient(logoUrl);
           const logoHeight = 110;
           const logoWidth = (logo.width / logo.height) * logoHeight;
-          ctx.drawImage(logo
+          ctx.drawImage(logo, 40, 40, Math.min(logoWidth, 400), logoHeight);
+        } catch (e) {
+          console.error("Logo failed all resilient tiers. Using default.", e);
+          renderDefaultLogo(ctx);
+        }
+      } else {
+        renderDefaultLogo(ctx);
+      }
+
+      // 4. Watermark (Non-Modern templates)
+      if (template !== TemplateType.MODERN_NEWS) {
+        ctx.fillStyle = template === TemplateType.MINIMALIST ? config.accentColor : 'rgba(255, 255, 255, 0.4)';
+        ctx.font = '600 22px Inter';
+        ctx.textAlign = 'right';
+        ctx.fillText('POWERED BY NEWSFLOW', canvas.width - 60, canvas.height - 60);
+      }
+
+      // 5. Final Export
+      if (onExport) {
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          onExport(dataUrl);
+        } catch (exportError) {
+          console.error("Export blocked. Canvas tainted.", exportError);
+        }
+      }
+    };
+
+    render();
+  }, [post, template, logoUrl, wordpressUrl, onExport]);
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-gray-900 border-4 border-white aspect-square w-full">
+      <canvas ref={canvasRef} width={1080} height={1080} className="w-full h-full" />
+    </div>
+  );
+};
+
+export default CanvasPreview;
