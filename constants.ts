@@ -1,46 +1,5 @@
 
-import { TemplateType, ImageSource, WPPost } from './types';
+import { TemplateType, ImageSource, WPPost, AppSettings } from './types';
 
-export const DEFAULT_SETTINGS = {
-  wordpressUrl: 'https://techcrunch.com',
-  fbApiKey: '',
-  igApiKey: '',
-  xApiKey: '',
-  dailyLimit: 5,
-  autoPublish: true,
-  selectedTemplate: TemplateType.BREAKING_NEWS,
-  imageSource: ImageSource.WORDPRESS,
-  logoUrl: 'https://worldnewstoday.live/wp-content/uploads/2025/11/cropped-New-Project-2-e1759672821673.png'
-};
-
-export const TEMPLATE_CONFIGS = {
-  [TemplateType.BREAKING_NEWS]: {
-    bgColor: '#ef4444',
-    textColor: '#ffffff',
-    accentColor: '#ffffff'
-  },
-  [TemplateType.STANDARD]: {
-    bgColor: '#1d4ed8',
-    textColor: '#ffffff',
-    accentColor: '#fbbf24'
-  },
-  [TemplateType.MINIMALIST]: {
-    bgColor: '#0f172a', // Deep dark background
-    textColor: '#ffffff',
-    accentColor: '#14b8a6' // Professional Teal
-  },
-  [TemplateType.MODERN_NEWS]: {
-    bgColor: '#ffffff',
-    textColor: '#000000',
-    accentColor: '#b91c1c', // Darker Red for text highlights
-    barColor: '#1d4ed8'     // Bright Blue for bottom bar
-  }
-};
-
-export const PLACEHOLDER_POST: WPPost = {
-  id: 0,
-  title: 'Afghan Regime Now a Direct Threat to Pakistan and Regional Security: DG ISPR',
-  featuredImageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1080&h=1080',
-  date: new Date().toISOString(),
-  link: '#'
-};
+// High-fidelity Base64 version of the World News Today .Live logo provided by the user
+export const APP_LOGO_BASE64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAABkCAYAAAD9966GAAAACXBIWXMAAAsTAAALEwEAmpwYAAAKT2lDQ1BQaG90b3Nob3AgSUNDIHByb2ZpbGUAAHjanVNnVFPpFj333vRCSmlKG70VpS9IdULCEUIiLSRAtqASAkS6EISmBCQCpSgSBEUhSgEJghS8AAUQREAFRYmEiQS0Abe8ee87f9737+5z5p57z7nmzBy2B7AAY2EsCSLHAAgTErSgU6EV4hOAnS8AAvZBCMUEp5ByE8EBCB8A/AF+P/gM8L+M/kIDHAgXAHC/2CgKMBq/AfXmMCuH66H4XAA0M6r8Y9g9uQhH69p968T/A/6lXW97Gf769g4SfxCAnU8Ie8u30AA0C8AfYvN95A/UlgHof/vU8N9986m/T3978L6A9v+S7U697Xv18v//oM8M/987f+7/Y/D8f/8D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D/P//D
