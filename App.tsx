@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from './components/Layout';
 import CanvasPreview from './components/CanvasPreview';
@@ -11,7 +10,7 @@ import {
   TemplateType,
   ImageSource
 } from './types';
-import { DEFAULT_SETTINGS, TEMPLATE_CONFIGS, PLACEHOLDER_POST } from './constants';
+import { DEFAULT_SETTINGS, TEMPLATE_CONFIGS, PLACEHOLDER_POST, APP_LOGO_BASE64 } from './constants';
 import { fetchLatestPost, testWPConnection } from './services/wordpress';
 import { generateSocialCaption, generatePostImage } from './services/gemini';
 import { publishToPlatform } from './services/socialMedia';
@@ -36,7 +35,9 @@ import {
   Layout as LayoutIcon,
   Monitor,
   Newspaper,
-  HelpCircle
+  HelpCircle,
+  Upload,
+  X
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -68,6 +69,7 @@ const App: React.FC = () => {
   });
   
   const [countdown, setCountdown] = useState(60);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const stats: SystemStats = {
     todayPosts: logs.filter(l => new Date(l.timestamp).toDateString() === new Date().toDateString()).length,
@@ -198,6 +200,23 @@ const App: React.FC = () => {
     const aiCaption = await generateSocialCaption(currentPost.title);
     setCurrentCaption(aiCaption || `${currentPost.title} #news #update`);
     setIsGeneratingCaption(false);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setSettings({ ...settings, logoUrl: base64String });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearLogo = () => {
+    setSettings({ ...settings, logoUrl: '' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -529,85 +548,124 @@ const App: React.FC = () => {
               <div className="mt-12 pt-12 border-t border-gray-100">
                  <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
                     <LayoutIcon size={24} className="text-indigo-600" />
-                    Template Designer & Live Preview
+                    Template Designer & Branding
                  </h3>
                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                    <div className="lg:col-span-5 space-y-4">
-                      <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-2">Select a Design Style</p>
-                      {[TemplateType.BREAKING_NEWS, TemplateType.STANDARD, TemplateType.MINIMALIST, TemplateType.MODERN_NEWS].map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setSettings({...settings, selectedTemplate: t})}
-                          className={`relative w-full group p-4 rounded-2xl border-2 transition-all flex items-center gap-4 text-left ${
-                            settings.selectedTemplate === t 
-                              ? 'border-indigo-600 bg-indigo-50/50 shadow-md' 
-                              : 'border-gray-100 hover:border-gray-200 bg-white'
-                          }`}
-                        >
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm ${
-                            t === TemplateType.BREAKING_NEWS ? 'bg-red-500' : 
-                            t === TemplateType.STANDARD ? 'bg-blue-600' : 
-                            t === TemplateType.MODERN_NEWS ? 'bg-indigo-600' : 'bg-slate-900'
-                          }`}>
-                             {t === TemplateType.BREAKING_NEWS && <AlertCircle size={20} />}
-                             {t === TemplateType.STANDARD && <LayoutIcon size={20} />}
-                             {t === TemplateType.MINIMALIST && <Monitor size={20} />}
-                             {t === TemplateType.MODERN_NEWS && <Newspaper size={20} />}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-bold text-gray-900">{t}</p>
-                            <p className="text-xs text-gray-500">
-                              {t === TemplateType.BREAKING_NEWS && 'Urgent red alert with heavy headline.'}
-                              {t === TemplateType.STANDARD && 'Elegant blue horizontal design accent.'}
-                              {t === TemplateType.MINIMALIST && 'Sophisticated dark mode with teal lines.'}
-                              {t === TemplateType.MODERN_NEWS && 'Bold centered headlines with accent box.'}
-                            </p>
-                          </div>
-                          {settings.selectedTemplate === t && (
-                            <div className="text-indigo-600">
-                              <CheckCircle2 size={24} />
-                            </div>
-                          )}
-                        </button>
-                      ))}
+                    <div className="lg:col-span-5 space-y-6">
+                      <div>
+                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Design Style</p>
+                        <div className="space-y-3">
+                          {[TemplateType.BREAKING_NEWS, TemplateType.STANDARD, TemplateType.MINIMALIST, TemplateType.MODERN_NEWS].map((t) => (
+                            <button
+                              key={t}
+                              onClick={() => setSettings({...settings, selectedTemplate: t})}
+                              className={`relative w-full group p-4 rounded-2xl border-2 transition-all flex items-center gap-4 text-left ${
+                                settings.selectedTemplate === t 
+                                  ? 'border-indigo-600 bg-indigo-50/50 shadow-md' 
+                                  : 'border-gray-100 hover:border-gray-200 bg-white'
+                              }`}
+                            >
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm ${
+                                t === TemplateType.BREAKING_NEWS ? 'bg-red-500' : 
+                                t === TemplateType.STANDARD ? 'bg-blue-600' : 
+                                t === TemplateType.MODERN_NEWS ? 'bg-indigo-600' : 'bg-slate-900'
+                              }`}>
+                                {t === TemplateType.BREAKING_NEWS && <AlertCircle size={18} />}
+                                {t === TemplateType.STANDARD && <LayoutIcon size={18} />}
+                                {t === TemplateType.MINIMALIST && <Monitor size={18} />}
+                                {t === TemplateType.MODERN_NEWS && <Newspaper size={18} />}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-bold text-gray-900 text-sm">{t}</p>
+                              </div>
+                              {settings.selectedTemplate === t && (
+                                <div className="text-indigo-600">
+                                  <CheckCircle2 size={20} />
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                      <div className="pt-6 space-y-4">
+                      <div className="space-y-4 pt-4 border-t border-gray-100">
+                        <label className="block text-sm font-bold text-gray-700">Logo Management</label>
+                        
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className={`relative p-6 border-2 border-dashed rounded-2xl transition-all flex flex-col items-center justify-center gap-3 ${settings.logoUrl?.startsWith('data:') ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/20'}`}>
+                             {settings.logoUrl ? (
+                               <div className="flex flex-col items-center gap-3">
+                                 <div className="relative group">
+                                    <div className="w-24 h-16 bg-white rounded-lg shadow-sm border border-gray-100 p-2 flex items-center justify-center overflow-hidden">
+                                       <img src={settings.logoUrl} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
+                                    </div>
+                                    <button 
+                                      onClick={clearLogo}
+                                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 transition-colors"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                 </div>
+                                 <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                                    <CheckCircle2 size={12} />
+                                    Custom Logo Active
+                                 </p>
+                               </div>
+                             ) : (
+                               <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex flex-col items-center gap-2 group"
+                               >
+                                 <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 group-hover:text-indigo-500 group-hover:bg-indigo-50 transition-all">
+                                   <Upload size={20} />
+                                 </div>
+                                 <div className="text-center">
+                                   <p className="text-sm font-bold text-gray-700">Upload Logo</p>
+                                   <p className="text-xs text-gray-400">PNG, JPG, SVG (Max 2MB)</p>
+                                 </div>
+                               </button>
+                             )}
+                             <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleFileUpload} 
+                                accept="image/*" 
+                                className="hidden" 
+                             />
+                          </div>
+
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                              <Globe size={16} />
+                            </div>
+                            <input 
+                              type="text" 
+                              value={settings.logoUrl?.startsWith('data:') ? '' : settings.logoUrl}
+                              onChange={(e) => setSettings({...settings, logoUrl: e.target.value})}
+                              placeholder="Or provide a Logo URL..."
+                              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-4 focus:ring-indigo-50 outline-none text-sm" 
+                            />
+                          </div>
+                        </div>
+
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-2">Image Source</label>
                           <div className="grid grid-cols-2 gap-3">
                             <button 
                               onClick={() => setSettings({...settings, imageSource: ImageSource.WORDPRESS})}
-                              className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-bold transition-all ${settings.imageSource === ImageSource.WORDPRESS ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                              className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all ${settings.imageSource === ImageSource.WORDPRESS ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                             >
-                              <ImageIcon size={18} />
+                              <ImageIcon size={16} />
                               WP Featured
                             </button>
                             <button 
                               onClick={() => setSettings({...settings, imageSource: ImageSource.AI_GENERATED})}
-                              className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-bold transition-all ${settings.imageSource === ImageSource.AI_GENERATED ? 'bg-amber-500 border-amber-500 text-white shadow-lg' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                              className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all ${settings.imageSource === ImageSource.AI_GENERATED ? 'bg-amber-500 border-amber-500 text-white shadow-lg' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                             >
-                              <Sparkles size={18} />
+                              <Sparkles size={16} />
                               AI Generated
                             </button>
                           </div>
-                        </div>
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                             <label className="block text-sm font-bold text-gray-700">Organization Logo URL</label>
-                             <div className="group relative">
-                                <HelpCircle size={14} className="text-gray-400 cursor-help" />
-                                <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                                   The system automatically uses a CORS proxy for external logos. If your logo still doesn't render, ensure the URL is publicly accessible or try a different hosting service.
-                                </div>
-                             </div>
-                          </div>
-                          <input 
-                            type="text" 
-                            value={settings.logoUrl}
-                            onChange={(e) => setSettings({...settings, logoUrl: e.target.value})}
-                            placeholder="https://yourwebsite.com/logo.png"
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-4 focus:ring-indigo-50 outline-none transition-all" 
-                          />
                         </div>
                       </div>
                     </div>
@@ -615,7 +673,7 @@ const App: React.FC = () => {
                     <div className="lg:col-span-7 bg-gray-50 p-6 rounded-3xl border border-gray-200 flex flex-col items-center">
                        <div className="flex items-center gap-2 self-start mb-4 text-gray-400 font-bold text-xs uppercase tracking-widest">
                          <Monitor size={14} />
-                         Dynamic Preview Area
+                         Live Preview
                        </div>
                        <div className="w-full max-w-sm">
                          <CanvasPreview 
@@ -627,11 +685,16 @@ const App: React.FC = () => {
                        </div>
                        <div className="mt-4 flex flex-col items-center gap-1">
                           <p className="text-[10px] text-gray-400 text-center px-8 uppercase tracking-tighter leading-tight font-medium">
-                            The preview above shows how your social posts will look.
+                            Your social posts will be generated exactly as shown.
                           </p>
-                          {settings.logoUrl && (
+                          {settings.logoUrl && !settings.logoUrl.startsWith('data:') && (
                              <p className="text-[9px] text-indigo-400 font-bold italic animate-pulse">
-                                System is automatically bypassing CORS for your logo.
+                                Remote URL detected. Auto-bypassing CORS...
+                             </p>
+                          )}
+                          {settings.logoUrl?.startsWith('data:') && (
+                             <p className="text-[9px] text-emerald-500 font-bold italic">
+                                Local upload active. High reliability.
                              </p>
                           )}
                        </div>
