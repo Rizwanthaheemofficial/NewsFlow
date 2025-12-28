@@ -1,24 +1,48 @@
+import { Platform, EngagementMetrics } from '../types';
 
-import { Platform } from '../types';
-
-// In a real production environment, this would hit the official Graph/X APIs
+/**
+ * PRODUCTION SIMULATION ENGINE
+ * This mimics the behavior of the official Social APIs (Meta Graph, X v2, LinkedIn Marketing)
+ */
 export const publishToPlatform = async (
   platform: Platform, 
   imageUrl: string, 
   caption: string, 
   apiKey: string
 ): Promise<boolean> => {
-  console.log(`[${platform}] Publishing post with caption: ${caption}`);
+  console.log(`[NewsFlow Engine] Dispatching to ${platform}...`);
+  console.log(`[Payload] Image: ${imageUrl.substring(0, 30)}...`);
+  console.log(`[Payload] Caption: ${caption.substring(0, 50)}...`);
   
-  // Simulate API latency
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  // Real-world API latency simulation (Authentication & Media Uploading)
+  await new Promise(resolve => setTimeout(resolve, 3500));
   
   if (!apiKey && platform !== Platform.TWITTER) {
-    // For demo purposes, we allow success if no key is set but warn
-    console.warn(`${platform} API Key missing, simulating success for demo.`);
+    console.warn(`${platform} API Key missing, simulating success via Enterprise Demo Mode.`);
   }
 
-  // Simulate success/failure logic
-  const success = Math.random() > 0.05; // 95% success rate simulation
+  // 98% Success rate for production stability simulation
+  const success = Math.random() > 0.02; 
+  
+  if (success) {
+    console.log(`[${platform}] Broadcast SUCCESS. Transaction ID: TXN_${Math.random().toString(36).substr(2, 9)}`);
+  } else {
+    console.error(`[${platform}] Broadcast FAILED. Error: Rate Limit or Media Validation issue.`);
+  }
+
   return success;
+};
+
+/**
+ * Mock engagement engine
+ */
+export const fetchMetricsForPost = async (logId: string): Promise<EngagementMetrics> => {
+  await new Promise(resolve => setTimeout(resolve, 800));
+  
+  return {
+    likes: Math.floor(Math.random() * 1200) + 50,
+    shares: Math.floor(Math.random() * 300) + 10,
+    comments: Math.floor(Math.random() * 150) + 5,
+    reach: Math.floor(Math.random() * 15000) + 500
+  };
 };

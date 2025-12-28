@@ -1,5 +1,6 @@
+
 import React, { useRef, useEffect, useState } from 'react';
-import { TemplateType, WPPost } from '../types';
+import { TemplateType, WPPost, BrandingConfig } from '../types';
 import { TEMPLATE_CONFIGS, APP_LOGO_BASE64 } from '../constants';
 
 interface CanvasPreviewProps {
@@ -7,12 +8,16 @@ interface CanvasPreviewProps {
   template: TemplateType;
   logoUrl?: string;
   wordpressUrl?: string;
+  brandWebsite?: string;
+  branding?: BrandingConfig;
   onExport?: (dataUrl: string) => void;
 }
 
-const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, wordpressUrl, onExport }) => {
+// Global cache to prevent re-fetching/re-loading same images during template switches
+const imageCache: Record<string, HTMLImageElement> = {};
+
+const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, wordpressUrl, brandWebsite, branding, onExport }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [useFallbackLogo, setUseFallbackLogo] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -20,73 +25,51 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
-    const getProxyTier = (url: string, tier: number) => {
-      const cleanUrl = encodeURIComponent(url);
-      const cb = `&cb=${Date.now()}`;
-      switch (tier) {
-        case 0: return `https://wsrv.nl/?url=${cleanUrl}${cb}&output=png`;
-        case 1: return `https://corsproxy.io/?${url}`;
-        case 2: return `https://api.allorigins.win/raw?url=${cleanUrl}`;
-        default: return url;
-      }
+    const getProxySrc = (url: string) => {
+      if (url.startsWith('data:')) return url;
+      return `https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png&cb=${Date.now()}`;
     };
 
-    /**
-     * Resilient image loader that handles CORS and multiple proxy tiers.
-     * Robust handling for Data URLs and standard remote URLs.
-     */
-    const loadImageResilient = async (url: string): Promise<HTMLImageElement> => {
+    const loadImageCached = async (url: string): Promise<HTMLImageElement> => {
       if (!url) throw new Error("URL is missing");
-      
-      // Fast path for Data URLs (uploads)
-      if (url.startsWith('data:')) {
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error("Data URL rendering failed"));
-          img.src = url;
-        });
-      }
+      if (imageCache[url]) return imageCache[url];
 
-      const maxTiers = 3;
-      let lastError: string = "Unknown error";
-      
-      for (let tier = 0; tier < maxTiers; tier++) {
-        try {
-          const src = getProxyTier(url, tier);
-          const result = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.onload = () => resolve(img);
-            img.onerror = () => reject(new Error(`Tier ${tier} standard load failed`));
-            img.src = src;
-            setTimeout(() => reject(new Error(`Tier ${tier} timeout`)), 8000);
-          });
-          return result;
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : String(err);
-        }
-      }
-      throw new Error(`Failed to load image: ${lastError}`);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      return new Promise((resolve, reject) => {
+        img.onload = () => {
+          imageCache[url] = img;
+          resolve(img);
+        };
+        img.onerror = () => reject(new Error("Image failed to load"));
+        img.src = getProxySrc(url);
+      });
     };
 
     const render = async () => {
-      const config = TEMPLATE_CONFIGS[template] || TEMPLATE_CONFIGS[TemplateType.STANDARD];
+      const baseConfig = TEMPLATE_CONFIGS[template] || TEMPLATE_CONFIGS[TemplateType.STANDARD];
+      
+      const config = {
+        ...baseConfig,
+        accentColor: branding?.useCustomColors ? branding.accentColor : baseConfig.accentColor,
+        barColor: branding?.useCustomColors ? branding.primaryColor : baseConfig.barColor,
+      };
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 1. Background
+      // 1. Draw Background
       try {
-        const bgImg = await loadImageResilient(post.featuredImageUrl);
+        const bgImg = await loadImageCached(post.featuredImageUrl);
         const scale = Math.max(canvas.width / bgImg.width, canvas.height / bgImg.height);
         const x = (canvas.width / 2) - (bgImg.width / 2) * scale;
         const y = (canvas.height / 2) - (bgImg.height / 2) * scale;
         ctx.drawImage(bgImg, x, y, bgImg.width * scale, bgImg.height * scale);
       } catch (e) {
-        ctx.fillStyle = '#111827';
+        ctx.fillStyle = config.backgroundColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      // 2. Overlays
+      // 2. Apply Template Overlays
       if (template === TemplateType.MODERN_NEWS) {
         const margin = 35;
         const boxWidth = canvas.width - (margin * 2);
@@ -99,7 +82,7 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, canvas.height - 85, canvas.width, 85);
 
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = branding?.useCustomColors ? branding.primaryColor : '#ffffff';
         ctx.lineWidth = 14;
         ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, canvas.width - ctx.lineWidth, canvas.height - ctx.lineWidth);
 
@@ -113,8 +96,7 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
 
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > maxWidth && n > 0) {
+          if (ctx.measureText(testLine).width > maxWidth && n > 0) {
             lines.push(line.trim());
             line = words[n] + ' ';
           } else {
@@ -125,18 +107,84 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
 
         let currentTitleY = rectY + 115;
         lines.forEach((l, idx) => {
-          ctx.fillStyle = (idx >= lines.length - 1) ? config.accentColor : config.textColor;
+          ctx.fillStyle = (idx >= lines.length - 1) ? config.accentColor : '#111827';
           ctx.fillText(l, canvas.width / 2, currentTitleY);
           currentTitleY += 90;
         });
 
         ctx.fillStyle = '#ffffff';
         ctx.font = '800 32px Inter';
-        ctx.fillText((wordpressUrl || 'WORLDNEWSTODAY.LIVE').toUpperCase(), canvas.width / 2, canvas.height - 35);
+        ctx.fillText((brandWebsite || wordpressUrl || 'WORLDNEWSTODAY.LIVE').toUpperCase(), canvas.width / 2, canvas.height - 35);
 
-      } else {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      } else if (template === TemplateType.MINIMALIST) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${config.overlayOpacity})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = config.barColor;
+        ctx.fillRect(0, 0, 15, canvas.height);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '800 72px Inter';
+        ctx.textAlign = 'left';
+        
+        const words = post.title.split(' ');
+        let line = '';
+        let currentY = 320;
+        const maxWidth = canvas.width - 160;
+
+        for (let n = 0; n < words.length; n++) {
+          const testLine = line + words[n] + ' ';
+          if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillText(line.trim(), 80, currentY);
+            currentY += 90;
+            line = words[n] + ' ';
+          } else {
+            line = testLine;
+          }
+        }
+        ctx.fillStyle = config.accentColor;
+        ctx.fillText(line.trim(), 80, currentY);
+
+      } else if (template === TemplateType.BREAKING_NEWS) {
+        ctx.fillStyle = `rgba(220, 38, 38, ${config.overlayOpacity})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = config.barColor;
+        ctx.fillRect(0, canvas.height - 240, canvas.width, 240);
+
+        ctx.fillStyle = config.accentColor;
+        ctx.font = '900 48px Inter';
+        ctx.fillText('BREAKING NEWS', 60, canvas.height - 170);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '800 64px Inter';
+        const words = post.title.split(' ');
+        let line = '';
+        let currentY = canvas.height - 80;
+        const lines: string[] = [];
+        for (let n = 0; n < words.length; n++) {
+          const testLine = line + words[n] + ' ';
+          if (ctx.measureText(testLine).width > canvas.width - 120 && n > 0) {
+            lines.push(line);
+            line = words[n] + ' ';
+          } else {
+            line = testLine;
+          }
+        }
+        lines.push(line);
+        lines.slice(0, 2).reverse().forEach((l, i) => {
+           ctx.fillText(l.trim(), 60, currentY - (i * 75));
+        });
+      } else {
+        ctx.fillStyle = `rgba(0, 0, 0, ${config.overlayOpacity})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (branding?.useCustomColors) {
+            ctx.strokeStyle = config.barColor;
+            ctx.lineWidth = 20;
+            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+        }
 
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 68px Inter';
@@ -147,8 +195,7 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         const lines: string[] = [];
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > canvas.width - 120 && n > 0) {
+          if (ctx.measureText(testLine).width > canvas.width - 120 && n > 0) {
             lines.push(line);
             line = words[n] + ' ';
           } else {
@@ -157,55 +204,40 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         }
         lines.push(line);
         lines.reverse().forEach((l, i) => {
+          ctx.fillStyle = (i === 0) ? config.accentColor : '#ffffff';
           ctx.fillText(l.trim(), 60, currentY - (i * 85));
         });
       }
 
-      // 3. Logo
+      // 3. Draw Logo
       try {
-        const logoToUse = (logoUrl && logoUrl.trim() !== "" && !useFallbackLogo) ? logoUrl : APP_LOGO_BASE64;
-        const logo = await loadImageResilient(logoToUse).catch(async (err) => {
-          console.warn("Logo load failed, falling back to brand logo", err);
-          return await loadImageResilient(APP_LOGO_BASE64);
-        });
-        
-        const logoHeight = 120;
-        const logoWidth = (logo.width / logo.height) * logoHeight;
-        
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-        ctx.shadowColor = 'rgba(0,0,0,0.3)';
-        ctx.shadowBlur = 10;
-        const padding = 15;
-        ctx.fillRect(40 - padding, 40 - padding, Math.min(logoWidth, 400) + (padding * 2), logoHeight + (padding * 2));
-        
-        ctx.shadowBlur = 0;
-        ctx.drawImage(logo, 40, 40, Math.min(logoWidth, 400), logoHeight);
-      } catch (e) {
-        console.error("Critical logo failure:", e);
-      }
+        const logoToUse = (logoUrl && logoUrl.trim() !== "") 
+          ? logoUrl 
+          : (config.defaultLogo || APP_LOGO_BASE64);
 
-      // 4. Export
-      if (onExport) {
-        try {
-          onExport(canvas.toDataURL('image/png'));
-        } catch (exportErr) {
-          // If we are currently using a custom logo and it fails export, switch to fallback
-          if (!useFallbackLogo && logoUrl) {
-            setUseFallbackLogo(true);
-          }
+        const logo = await loadImageCached(logoToUse);
+        
+        const logoHeight = template === TemplateType.MINIMALIST ? 80 : 120;
+        const logoWidth = (logo.width / logo.height) * logoHeight;
+        const padding = 20;
+
+        if (template === TemplateType.MINIMALIST) {
+          ctx.drawImage(logo, canvas.width - logoWidth - 60, 60, logoWidth, logoHeight);
+        } else {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
+          ctx.fillRect(40 - padding, 40 - padding, Math.min(logoWidth, 400) + (padding * 2), logoHeight + (padding * 2));
+          ctx.drawImage(logo, 40, 40, Math.min(logoWidth, 400), logoHeight);
         }
-      }
+      } catch (e) {}
+
+      if (onExport) onExport(canvas.toDataURL('image/png'));
     };
 
     render();
-  }, [post, template, logoUrl, wordpressUrl, onExport, useFallbackLogo]);
-
-  useEffect(() => {
-    setUseFallbackLogo(false);
-  }, [logoUrl]);
+  }, [post, template, logoUrl, wordpressUrl, brandWebsite, branding, onExport]);
 
   return (
-    <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-gray-900 border-4 border-white aspect-square w-full">
+    <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-900 border-4 border-white aspect-square w-full">
       <canvas ref={canvasRef} width={1080} height={1080} className="w-full h-full" />
     </div>
   );
