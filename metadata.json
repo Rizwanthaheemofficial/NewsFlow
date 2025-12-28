@@ -1,5 +1,13 @@
 {
-  "name": "NewsFlow SaaS - Automated Social Media Publisher",
-  "description": "A professional SaaS-style dashboard for automating WordPress-to-social-media publishing. Features AI-powered captioning, custom image templates, and multi-platform automation.",
-  "requestFramePermissions": []
+  "name": "NewsFlow Pro",
+  "short_name": "NewsFlow",
+  "description": "Enterprise AI Social Media Automation Suite.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
 }

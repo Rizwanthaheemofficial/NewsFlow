@@ -13,7 +13,6 @@ interface CanvasPreviewProps {
   onExport?: (dataUrl: string) => void;
 }
 
-// Global cache to prevent re-fetching/re-loading same images during template switches
 const imageCache: Record<string, HTMLImageElement> = {};
 
 const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, wordpressUrl, brandWebsite, branding, onExport }) => {
@@ -48,16 +47,17 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
 
     const render = async () => {
       const baseConfig = TEMPLATE_CONFIGS[template] || TEMPLATE_CONFIGS[TemplateType.STANDARD];
-      
       const config = {
         ...baseConfig,
         accentColor: branding?.useCustomColors ? branding.accentColor : baseConfig.accentColor,
         barColor: branding?.useCustomColors ? branding.primaryColor : baseConfig.barColor,
       };
 
+      const handleText = (brandWebsite || wordpressUrl || 'NEWSROOM.LIVE').toUpperCase();
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 1. Draw Background
+      // 1. Background Image
       try {
         const bgImg = await loadImageCached(post.featuredImageUrl);
         const scale = Math.max(canvas.width / bgImg.width, canvas.height / bgImg.height);
@@ -69,7 +69,7 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      // 2. Apply Template Overlays
+      // 2. Overlays & Content
       if (template === TemplateType.MODERN_NEWS) {
         const margin = 35;
         const boxWidth = canvas.width - (margin * 2);
@@ -78,22 +78,21 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(margin, rectY, boxWidth, boxHeight);
-
+        
+        // Lower Third Bar
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, canvas.height - 85, canvas.width, 85);
-
+        
         ctx.strokeStyle = branding?.useCustomColors ? branding.primaryColor : '#ffffff';
         ctx.lineWidth = 14;
         ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, canvas.width - ctx.lineWidth, canvas.height - ctx.lineWidth);
-
+        
         ctx.textAlign = 'center';
         ctx.font = '800 68px Inter';
-        
         const words = post.title.split(' ');
         let lines: string[] = [];
         let line = '';
         const maxWidth = boxWidth - 100;
-
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
           if (ctx.measureText(testLine).width > maxWidth && n > 0) {
@@ -104,34 +103,32 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
           }
         }
         lines.push(line.trim());
-
         let currentTitleY = rectY + 115;
         lines.forEach((l, idx) => {
           ctx.fillStyle = (idx >= lines.length - 1) ? config.accentColor : '#111827';
           ctx.fillText(l, canvas.width / 2, currentTitleY);
           currentTitleY += 90;
         });
-
+        
+        // Handle In Lower Third
         ctx.fillStyle = '#ffffff';
         ctx.font = '800 32px Inter';
-        ctx.fillText((brandWebsite || wordpressUrl || 'WORLDNEWSTODAY.LIVE').toUpperCase(), canvas.width / 2, canvas.height - 35);
+        ctx.fillText(handleText, canvas.width / 2, canvas.height - 35);
 
       } else if (template === TemplateType.MINIMALIST) {
         ctx.fillStyle = `rgba(255, 255, 255, ${config.overlayOpacity})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+        
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, 0, 15, canvas.height);
-
+        
         ctx.fillStyle = '#0f172a';
         ctx.font = '800 72px Inter';
         ctx.textAlign = 'left';
-        
         const words = post.title.split(' ');
         let line = '';
         let currentY = 320;
         const maxWidth = canvas.width - 160;
-
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
           if (ctx.measureText(testLine).width > maxWidth && n > 0) {
@@ -146,17 +143,22 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         ctx.fillStyle = config.accentColor;
         ctx.fillText(line.trim(), 80, currentY);
 
+        // Footer Handle
+        ctx.fillStyle = config.barColor;
+        ctx.font = '800 24px Inter';
+        ctx.fillText(handleText, 80, canvas.height - 60);
+
       } else if (template === TemplateType.BREAKING_NEWS) {
         ctx.fillStyle = `rgba(220, 38, 38, ${config.overlayOpacity})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, canvas.height - 240, canvas.width, 240);
-
+        
         ctx.fillStyle = config.accentColor;
         ctx.font = '900 48px Inter';
         ctx.fillText('BREAKING NEWS', 60, canvas.height - 170);
-
+        
         ctx.fillStyle = '#ffffff';
         ctx.font = '800 64px Inter';
         const words = post.title.split(' ');
@@ -176,9 +178,22 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         lines.slice(0, 2).reverse().forEach((l, i) => {
            ctx.fillText(l.trim(), 60, currentY - (i * 75));
         });
+
+        // Ticker-style Handle
+        ctx.fillStyle = config.accentColor;
+        ctx.font = '900 28px Inter';
+        ctx.textAlign = 'right';
+        ctx.fillText(handleText, canvas.width - 60, canvas.height - 170);
+        ctx.textAlign = 'left';
+
       } else {
+        // STANDARD / DYNAMIC TEMPLATE
         ctx.fillStyle = `rgba(0, 0, 0, ${config.overlayOpacity})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Custom Lower Third Bar
+        ctx.fillStyle = config.barColor;
+        ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
 
         if (branding?.useCustomColors) {
             ctx.strokeStyle = config.barColor;
@@ -191,7 +206,7 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         ctx.textAlign = 'left';
         const words = post.title.split(' ');
         let line = '';
-        let currentY = canvas.height - 150;
+        let currentY = canvas.height - 180;
         const lines: string[] = [];
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
@@ -207,32 +222,45 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
           ctx.fillStyle = (i === 0) ? config.accentColor : '#ffffff';
           ctx.fillText(l.trim(), 60, currentY - (i * 85));
         });
+
+        // Footer Handle
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 32px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText(handleText, canvas.width / 2, canvas.height - 40);
+        ctx.textAlign = 'left';
       }
 
-      // 3. Draw Logo
+      // 3. Logo Rendering with Transparency & Shadow Support
       try {
         const logoToUse = (logoUrl && logoUrl.trim() !== "") 
           ? logoUrl 
-          : (config.defaultLogo || APP_LOGO_BASE64);
+          : (baseConfig.defaultLogo || APP_LOGO_BASE64);
 
         const logo = await loadImageCached(logoToUse);
-        
         const logoHeight = template === TemplateType.MINIMALIST ? 80 : 120;
         const logoWidth = (logo.width / logo.height) * logoHeight;
-        const padding = 20;
+        
+        ctx.save(); // Save state to apply shadow only to logo
+        
+        // Professional drop-shadow for transparent PNG visibility
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 4;
 
         if (template === TemplateType.MINIMALIST) {
           ctx.drawImage(logo, canvas.width - logoWidth - 60, 60, logoWidth, logoHeight);
         } else {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
-          ctx.fillRect(40 - padding, 40 - padding, Math.min(logoWidth, 400) + (padding * 2), logoHeight + (padding * 2));
-          ctx.drawImage(logo, 40, 40, Math.min(logoWidth, 400), logoHeight);
+          // Direct drawing without the white backing block
+          ctx.drawImage(logo, 40, 40, Math.min(logoWidth, 420), logoHeight);
         }
+        
+        ctx.restore(); // Restore state to clean up shadow
       } catch (e) {}
 
       if (onExport) onExport(canvas.toDataURL('image/png'));
     };
-
     render();
   }, [post, template, logoUrl, wordpressUrl, brandWebsite, branding, onExport]);
 

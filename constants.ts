@@ -21,12 +21,12 @@ export const TEMPLATE_CONFIGS = {
     overlayOpacity: 0.65
   },
   [TemplateType.MINIMALIST]: {
-    backgroundColor: '#f8fafc',
-    textColor: '#0f172a',
-    accentColor: '#6366f1',
-    barColor: '#e2e8f0',
-    // Custom minimalist monochrome logo
-    defaultLogo: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjUwIiB2aWV3Qm94PSIwIDAgMjAwIDUwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjx0ZXh0IHg9IjAiIHk9IjMzIiBmaWxsPSIjNDM0RUVGIiBmb250LWZhbWlseT0iSW50ZXIsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSI4MDAiPk5GPC90ZXh0Pjx0ZXh0IHg9IjQwIiB5PSIzMyIgZmlsbD0iIzBmMTcyYSIgZm9udC1mYW1pbHk9IkludGVyLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjI0IiBmb250LXdlaWdodD0iODAwIj5ORVdTRkxPVzwvdGV4dD48L3N2Zz4=',
+    backgroundColor: '#0f172a',
+    textColor: '#ffffff',
+    accentColor: '#2dd4bf', // Subtle Teal
+    barColor: '#1e293b',
+    // High-end white monochrome logo
+    defaultLogo: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjUwIiB2aWV3Qm94PSIwIDAgMjAwIDUwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjx0ZXh0IHg9IjAiIHk9IjMzIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iSW50ZXIsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSI4MDAiPk5FV1NGTE9XPC90ZXh0Pjwvc3ZnPg==',
     overlayOpacity: 0.2
   },
   [TemplateType.MODERN_NEWS]: {

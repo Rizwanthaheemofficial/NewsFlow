@@ -2,50 +2,83 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NewsFlow SaaS - Professional Content Automation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NewsFlow Pro | AI-Powered Content Automation SaaS</title>
+    
+    <!-- Primary Meta Tags -->
+    <meta name="title" content="NewsFlow Pro - Automated Content Studio">
+    <meta name="description" content="The ultimate SaaS platform for WordPress-to-Social-Media automation using Gemini 3 and Veo.">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://newsflow.live/">
+    <meta property="og:title" content="NewsFlow Pro - AI Content Automation">
+    <meta property="og:description" content="Generate branded social content, audio briefs, and cinematic teasers from your WordPress feed instantly.">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2426&auto=format&fit=crop">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="NewsFlow Pro">
+    <meta property="twitter:description" content="AI-Powered Content Automation for Modern Newsrooms.">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
+        :root {
+            --brand-indigo: #4f46e5;
+        }
+
         body { 
             font-family: 'Inter', sans-serif; 
             background-color: #f8fafc; 
             color: #0f172a;
             -webkit-font-smoothing: antialiased;
+            overscroll-behavior-y: none;
         }
 
-        /* Custom Scrollbar for the SaaS look */
+        /* High-Performance Rendering */
+        canvas {
+            will-change: transform;
+        }
+
+        /* Custom Scrollbar */
         .custom-scrollbar::-webkit-scrollbar {
-            width: 5px;
+            width: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
+            background: rgba(0,0,0,0.02);
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #e2e8f0;
-            border-radius: 10px;
+            border-radius: 20px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #cbd5e1;
         }
 
-        /* Glassmorphism Refinements */
+        /* Smooth UI Transitions */
         .glass-panel {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
-        @keyframes pulse-soft {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        @keyframes flow-gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
-        .animate-pulse-soft {
-            animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+        .animate-gradient {
+            background-size: 200% 200%;
+            animation: flow-gradient 5s ease infinite;
         }
     </style>
+
 <script type="importmap">
 {
   "imports": {

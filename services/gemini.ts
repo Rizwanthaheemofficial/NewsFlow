@@ -7,25 +7,83 @@ const MODEL_IMAGE = 'gemini-2.5-flash-image';
 const MODEL_TTS = 'gemini-2.5-flash-preview-tts';
 const MODEL_VIDEO = 'veo-3.1-fast-generate-preview';
 
-export const generateSocialCaption = async (postTitle: string, excerpt: string, postLink: string, config: AIConfig): Promise<ContentVariations> => {
+export interface HashtagSet {
+  niche: string[];
+  broad: string[];
+  trending: string[];
+}
+
+export const generateHashtags = async (title: string, excerpt: string): Promise<HashtagSet> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const prompt = `
+    Act as a social media SEO expert. Generate 15 highly relevant hashtags for this article.
+    Title: "${title}"
+    Excerpt: "${excerpt}"
+    
+    Return a JSON object with exactly these categories:
+    - "niche": 5 specific, low-competition tags.
+    - "broad": 5 high-volume, general industry tags.
+    - "trending": 5 buzzwords related to the topic.
+    
+    Constraints:
+    - Return ONLY the JSON object.
+    - No "#" symbol in the string values, just the words.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_TEXT,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            niche: { type: Type.ARRAY, items: { type: Type.STRING } },
+            broad: { type: Type.ARRAY, items: { type: Type.STRING } },
+            trending: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["niche", "broad", "trending"]
+        }
+      }
+    });
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error('Hashtag Generation Error:', error);
+    return { niche: ['news'], broad: ['update'], trending: ['trending'] };
+  }
+};
+
+export const generateSocialCaption = async (
+  postTitle: string, 
+  excerpt: string, 
+  postLink: string, 
+  config: AIConfig,
+  toneOverride?: string
+): Promise<ContentVariations> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
+  const selectedTone = toneOverride || config.brandVoice;
+  
   const prompt = `
-    Task: Write 4 unique social media captions for this news post.
+    Task: Write 4 unique, highly engaging social media captions for this news article.
     Post Title: "${postTitle}"
     Post Excerpt: "${excerpt}"
     Post Link: "${postLink}"
-    Voice: ${config.brandVoice}
+    Voice/Tone: ${selectedTone}
     Include Emojis: ${config.includeEmojis}
     Language: ${config.targetLanguage}
     
-    Return a JSON object with keys: "Facebook", "Instagram", "Twitter", "LinkedIn".
-    - Twitter should be under 280 chars with hooks and the link.
-    - Instagram should have 5-7 hashtags and mention the link in bio or use the link directly if appropriate.
-    - LinkedIn should be professional and thought-provoking, including the link.
-    - Facebook should be engaging and conversation-starting, including the link.
-    - Translate all content to ${config.targetLanguage}.
-    - ALWAYS include the post link: ${postLink} in the captions.
+    Rules for Variations:
+    - Facebook: Conversational, community-focused, includes the link.
+    - Instagram: Visual-first descriptions, clear CTA, 5-7 relevant hashtags.
+    - Twitter: Punchy, high-impact hooks, under 280 characters, includes the link.
+    - LinkedIn: Professional insights, industry context, thought-provoking question at the end, includes the link.
+    
+    Constraints:
+    - Return a JSON object with keys: "Facebook", "Instagram", "Twitter", "LinkedIn".
+    - All text must be in ${config.targetLanguage}.
+    - Link to include: ${postLink}
   `;
   
   try {
@@ -44,26 +102,32 @@ export const generateSocialCaption = async (postTitle: string, excerpt: string, 
             LinkedIn: { type: Type.STRING }
           },
           required: ["Facebook", "Instagram", "Twitter", "LinkedIn"]
-        },
-        tools: config.useGrounding ? [{ googleSearch: {} }] : undefined
+        }
       }
     });
     
     return JSON.parse(response.text || "{}");
   } catch (error) {
     console.error('AI Multi-Caption Error:', error);
-    const fallback = `News Update: ${postTitle} - Read more: ${postLink}`;
-    return { Facebook: fallback, Instagram: fallback, Twitter: fallback, LinkedIn: fallback };
+    // Explicit Fallback Strategy
+    const fallback = `${postTitle}\n\nRead the full story here: ${postLink}`;
+    return { 
+      Facebook: fallback, 
+      Instagram: fallback + "\n\n#news #update", 
+      Twitter: `New Post: ${postTitle} ${postLink}`, 
+      LinkedIn: `I just published a new update on: ${postTitle}. Check it out here: ${postLink}` 
+    };
   }
 };
 
 export const predictPerformance = async (title: string, caption: string): Promise<PerformanceScore> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `
-    Act as a high-level social media strategist. 
-    Analyze this post for potential viral engagement.
-    Title: "${title}"
-    Caption: "${caption}"
+    Act as a senior social media data scientist. 
+    Predict the engagement potential for this post.
+    
+    Article Title: "${title}"
+    Draft Caption: "${caption}"
     
     Return a JSON object:
     {
@@ -94,7 +158,12 @@ export const predictPerformance = async (title: string, caption: string): Promis
     });
     return JSON.parse(response.text || "{}");
   } catch (error) {
-    return { score: 70, label: "Medium", reasoning: ["Standard performance"], suggestions: ["Add a CTA"] };
+    return { 
+      score: 50, 
+      label: "Medium", 
+      reasoning: ["Simulation fallback active"], 
+      suggestions: ["Try adding more engaging hooks or specific hashtags."] 
+    };
   }
 };
 
@@ -113,10 +182,7 @@ export const generateAudioBrief = async (text: string): Promise<string | null> =
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (base64Audio) {
-      return `data:audio/wav;base64,${base64Audio}`;
-    }
-    return null;
+    return base64Audio || null;
   } catch (error) {
     console.error('TTS Error:', error);
     return null;
@@ -151,35 +217,6 @@ export const generateVideoTeaser = async (prompt: string, onProgress?: (msg: str
     return URL.createObjectURL(blob);
   } catch (error) {
     console.error('Video Gen Error:', error);
-    return null;
-  }
-};
-
-export const refineImage = async (base64Image: string, prompt: string): Promise<string | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  try {
-    const response = await ai.models.generateContent({
-      model: MODEL_IMAGE,
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: base64Image.split(',')[1],
-              mimeType: 'image/png'
-            }
-          },
-          { text: `Modify this image: ${prompt}` }
-        ]
-      }
-    });
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-    return null;
-  } catch (error) {
     return null;
   }
 };
