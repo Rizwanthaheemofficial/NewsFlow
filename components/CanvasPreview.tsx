@@ -19,13 +19,15 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    let isCancelled = false;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     const getProxySrc = (url: string) => {
-      if (url.startsWith('data:')) return url;
+      if (!url) return '';
+      if (url.startsWith('data:') || url.startsWith('blob:')) return url;
       return `https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png&cb=${Date.now()}`;
     };
 
@@ -33,13 +35,31 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
       if (!url) throw new Error("URL is missing");
       if (imageCache[url]) return imageCache[url];
 
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      return new Promise((resolve, reject) => {
-        img.onload = () => { imageCache[url] = img; resolve(img); };
-        img.onerror = () => reject(new Error("Image load failed"));
-        img.src = getProxySrc(url);
-      });
+      const tryLoad = (src: string): Promise<HTMLImageElement> => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        return new Promise((resolve, reject) => {
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error(`Load failed: ${src}`));
+          img.src = src;
+        });
+      };
+
+      try {
+        // Attempt with proxy first to bypass CORS
+        const img = await tryLoad(getProxySrc(url));
+        imageCache[url] = img;
+        return img;
+      } catch (e) {
+        // Direct fallback if proxy fails (might work if CORS headers allow)
+        try {
+          const img = await tryLoad(url);
+          imageCache[url] = img;
+          return img;
+        } catch (e2) {
+          throw e2;
+        }
+      }
     };
 
     const render = async () => {
@@ -53,17 +73,24 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
       const handleText = (brandWebsite || wordpressUrl || 'NEWSFLOW.LIVE').toUpperCase();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 1. Background
+      // 1. Background - Prioritize AI Image
       try {
-        const bgImg = await loadImageCached(post.featuredImageUrl);
+        const imgUrl = post.aiImageUrl || post.featuredImageUrl;
+        const bgImg = await loadImageCached(imgUrl);
+        
+        if (isCancelled) return;
+
         const scale = Math.max(canvas.width / bgImg.width, canvas.height / bgImg.height);
         const x = (canvas.width / 2) - (bgImg.width / 2) * scale;
         const y = (canvas.height / 2) - (bgImg.height / 2) * scale;
         ctx.drawImage(bgImg, x, y, bgImg.width * scale, bgImg.height * scale);
       } catch (e) {
+        console.error("Canvas background render failed:", e);
         ctx.fillStyle = config.backgroundColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
+
+      if (isCancelled) return;
 
       // 2. Overlays & Content Variations
       if (template === TemplateType.MODERN_NEWS) {
@@ -179,10 +206,15 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         ctx.textAlign = 'left';
       }
 
-      // 3. Transparent PNG Logo with Adaptive Shadow
+      if (isCancelled) return;
+
+      // 3. Logo
       try {
         const logoToUse = (logoUrl && logoUrl.trim() !== "") ? logoUrl : (baseConfig.defaultLogo || APP_LOGO_BASE64);
         const logo = await loadImageCached(logoToUse);
+        
+        if (isCancelled) return;
+
         const logoHeight = template === TemplateType.MINIMALIST ? 80 : 120;
         const logoWidth = (logo.width / logo.height) * logoHeight;
         
@@ -199,9 +231,14 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         ctx.restore();
       } catch (e) {}
 
-      if (onExport) onExport(canvas.toDataURL('image/png'));
+      if (onExport && !isCancelled) onExport(canvas.toDataURL('image/png'));
     };
+
     render();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [post, template, logoUrl, wordpressUrl, brandWebsite, branding, onExport]);
 
   return (

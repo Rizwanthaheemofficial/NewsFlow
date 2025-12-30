@@ -112,16 +112,17 @@ const App: React.FC = () => {
     if (!selectedPost) return;
     setGenerating('Processing AI Content...');
     try {
+      // 1. Generate core captions and specialized hashtags in parallel
       const [newCaptions, newHashtags] = await Promise.all([
         generateSocialCaption(selectedPost.title, selectedPost.excerpt || '', selectedPost.link, settings.aiConfig),
         generateHashtags(selectedPost.title, selectedPost.excerpt || '')
       ]);
 
-      // Create brand-specific hashtag
+      // 2. Construct the brand-specific hashtag
       const brandClean = settings.brandWebsite.replace(/[^a-zA-Z0-9]/g, '');
       const brandTag = `#${brandClean.charAt(0).toUpperCase() + brandClean.slice(1).toLowerCase()}`;
       
-      // Combine curated hashtags
+      // 3. Assemble the hashtag string from multiple AI-generated categories
       const hashtagPool = [
         brandTag,
         ...newHashtags.niche.slice(0, 3).map(h => h.startsWith('#') ? h : `#${h.replace(/\s+/g, '')}`),
@@ -130,7 +131,7 @@ const App: React.FC = () => {
       ];
       const hashtagString = hashtagPool.join(' ');
 
-      // Enriched captions with hashtags appended
+      // 4. Enrich platform-specific captions with the hashtag block
       const enrichedCaptions: ContentVariations = {
         [Platform.FACEBOOK]: `${newCaptions[Platform.FACEBOOK]}\n\n${hashtagString}`,
         [Platform.INSTAGRAM]: `${newCaptions[Platform.INSTAGRAM]}\n\n${hashtagString}`,
@@ -141,6 +142,7 @@ const App: React.FC = () => {
       setCaptions(enrichedCaptions);
       setHashtags(newHashtags);
       
+      // 5. Predict performance based on the primary broadcast channel (Facebook fallback)
       const newScore = await predictPerformance(selectedPost.title, enrichedCaptions[Platform.FACEBOOK]);
       setScore(newScore);
     } catch (e) {
@@ -278,24 +280,30 @@ const App: React.FC = () => {
                       <Globe size={40} className="mx-auto mb-4 opacity-20" />
                       <p className="text-xs font-bold uppercase tracking-widest">No stories found</p>
                     </div>
-                  ) : posts.map(post => (
-                    <button 
-                      key={post.id}
-                      onClick={() => handlePostSelection(post)}
-                      className={`w-full text-left p-4 rounded-2xl transition-all border-2 flex gap-4 group ${selectedPost?.id === post.id ? 'border-indigo-600 bg-indigo-50/30' : 'border-transparent hover:bg-slate-50'}`}
-                    >
-                      <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 border border-slate-100 shadow-sm">
-                        <img src={post.featuredImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`text-sm font-bold leading-snug line-clamp-2 ${selectedPost?.id === post.id ? 'text-indigo-900' : 'text-slate-900'}`}>{post.title}</h3>
-                        <div className="flex items-center gap-2 mt-2">
-                           <Clock size={12} className="text-slate-400" />
-                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{new Date(post.date).toLocaleDateString()}</span>
+                  ) : posts.map(post => {
+                    const displayImage = (selectedPost?.id === post.id && selectedPost.aiImageUrl) 
+                      ? selectedPost.aiImageUrl 
+                      : post.featuredImageUrl;
+
+                    return (
+                      <button 
+                        key={post.id}
+                        onClick={() => handlePostSelection(post)}
+                        className={`w-full text-left p-4 rounded-2xl transition-all border-2 flex gap-4 group ${selectedPost?.id === post.id ? 'border-indigo-600 bg-indigo-50/30' : 'border-transparent hover:bg-slate-50'}`}
+                      >
+                        <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 border border-slate-100 shadow-sm">
+                          <img src={displayImage} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                        <div className="flex-1 min-w-0">
+                          <h3 className={`text-sm font-bold leading-snug line-clamp-2 ${selectedPost?.id === post.id ? 'text-indigo-900' : 'text-slate-900'}`}>{post.title}</h3>
+                          <div className="flex items-center gap-2 mt-2">
+                             <Clock size={12} className="text-slate-400" />
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{new Date(post.date).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -367,8 +375,16 @@ const App: React.FC = () => {
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Caption</label>
                               <textarea 
                                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium leading-relaxed min-h-[120px] outline-none focus:border-indigo-500"
-                                value={captions[Platform.FACEBOOK]} // Reactive update
-                                onChange={(e) => setCaptions({ ...captions, [Platform.FACEBOOK]: e.target.value, [Platform.INSTAGRAM]: e.target.value, [Platform.TWITTER]: e.target.value, [Platform.LINKEDIN]: e.target.value })}
+                                value={captions[Platform.FACEBOOK]} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setCaptions({
+                                    [Platform.FACEBOOK]: val,
+                                    [Platform.INSTAGRAM]: val,
+                                    [Platform.TWITTER]: val,
+                                    [Platform.LINKEDIN]: val
+                                  });
+                                }}
                               />
                               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">AI auto-appended brand and trending hashtags</p>
                            </div>
@@ -379,7 +395,7 @@ const App: React.FC = () => {
                                 <div className="flex flex-wrap gap-1.5">
                                   {/* Showing the brand hashtag first */}
                                   <span className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-black">
-                                    #{settings.brandWebsite.replace(/[^a-zA-Z0-9]/g, '')}
+                                    #{settings.brandWebsite.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}
                                   </span>
                                   {hashtags.niche.concat(hashtags.trending).slice(0, 8).map((h, i) => (
                                     <span key={i} className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold">#{h}</span>
