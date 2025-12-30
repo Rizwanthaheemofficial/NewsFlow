@@ -18,6 +18,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src"],          // ensure TypeScript checks only your source files
-  "exclude": ["node_modules", "dist"] // ignore build output
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
 }
