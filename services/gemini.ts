@@ -15,20 +15,7 @@ export interface HashtagSet {
 
 export const generateHashtags = async (title: string, excerpt: string): Promise<HashtagSet> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `
-    Act as a social media SEO expert. Generate 15 highly relevant hashtags for this article.
-    Title: "${title}"
-    Excerpt: "${excerpt}"
-    
-    Return a JSON object with exactly these categories:
-    - "niche": 5 specific, low-competition tags.
-    - "broad": 5 high-volume, general industry tags.
-    - "trending": 5 buzzwords related to the topic.
-    
-    Constraints:
-    - Return ONLY the JSON object.
-    - No "#" symbol in the string values, just the words.
-  `;
+  const prompt = `Generate 15 SEO-optimized hashtags for a social post about: "${title}". Excerpt: "${excerpt}". Return JSON with niche, broad, and trending arrays.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -49,7 +36,6 @@ export const generateHashtags = async (title: string, excerpt: string): Promise<
     });
     return JSON.parse(response.text || "{}");
   } catch (error) {
-    console.error('Hashtag Generation Error:', error);
     return { niche: ['news'], broad: ['update'], trending: ['trending'] };
   }
 };
@@ -62,29 +48,9 @@ export const generateSocialCaption = async (
   toneOverride?: string
 ): Promise<ContentVariations> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const selectedTone = toneOverride || config.brandVoice;
   
-  const prompt = `
-    Task: Write 4 unique, highly engaging social media captions for this news article.
-    Post Title: "${postTitle}"
-    Post Excerpt: "${excerpt}"
-    Post Link: "${postLink}"
-    Voice/Tone: ${selectedTone}
-    Include Emojis: ${config.includeEmojis}
-    Language: ${config.targetLanguage}
-    
-    Rules for Variations:
-    - Facebook: Conversational, community-focused, includes the link.
-    - Instagram: Visual-first descriptions, clear CTA, 5-7 relevant hashtags.
-    - Twitter: Punchy, high-impact hooks, under 280 characters, includes the link.
-    - LinkedIn: Professional insights, industry context, thought-provoking question at the end, includes the link.
-    
-    Constraints:
-    - Return a JSON object with keys: "Facebook", "Instagram", "Twitter", "LinkedIn".
-    - All text must be in ${config.targetLanguage}.
-    - Link to include: ${postLink}
-  `;
+  const prompt = `Write 4 unique social captions for: "${postTitle}". Excerpt: "${excerpt}". Link: "${postLink}". Voice: ${selectedTone}. Language: ${config.targetLanguage}. Return JSON with Facebook, Instagram, Twitter, LinkedIn keys.`;
   
   try {
     const response = await ai.models.generateContent({
@@ -105,38 +71,16 @@ export const generateSocialCaption = async (
         }
       }
     });
-    
     return JSON.parse(response.text || "{}");
   } catch (error) {
-    console.error('AI Multi-Caption Error:', error);
-    // Explicit Fallback Strategy
-    const fallback = `${postTitle}\n\nRead the full story here: ${postLink}`;
-    return { 
-      Facebook: fallback, 
-      Instagram: fallback + "\n\n#news #update", 
-      Twitter: `New Post: ${postTitle} ${postLink}`, 
-      LinkedIn: `I just published a new update on: ${postTitle}. Check it out here: ${postLink}` 
-    };
+    const fallback = `${postTitle} - ${postLink}`;
+    return { Facebook: fallback, Instagram: fallback, Twitter: fallback, LinkedIn: fallback };
   }
 };
 
 export const predictPerformance = async (title: string, caption: string): Promise<PerformanceScore> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `
-    Act as a senior social media data scientist. 
-    Predict the engagement potential for this post.
-    
-    Article Title: "${title}"
-    Draft Caption: "${caption}"
-    
-    Return a JSON object:
-    {
-      "score": number (0-100),
-      "label": "Low" | "Medium" | "High" | "Viral Potential",
-      "reasoning": string[],
-      "suggestions": string[]
-    }
-  `;
+  const prompt = `Analyze engagement potential for: Title: "${title}", Caption: "${caption}". Return JSON score (0-100), label, reasoning[], suggestions[].`;
 
   try {
     const response = await ai.models.generateContent({
@@ -158,12 +102,7 @@ export const predictPerformance = async (title: string, caption: string): Promis
     });
     return JSON.parse(response.text || "{}");
   } catch (error) {
-    return { 
-      score: 50, 
-      label: "Medium", 
-      reasoning: ["Simulation fallback active"], 
-      suggestions: ["Try adding more engaging hooks or specific hashtags."] 
-    };
+    return { score: 50, label: "Medium", reasoning: [], suggestions: [] };
   }
 };
 
@@ -172,7 +111,7 @@ export const generateAudioBrief = async (text: string): Promise<string | null> =
   try {
     const response = await ai.models.generateContent({
       model: MODEL_TTS,
-      contents: [{ parts: [{ text: `Read this news brief in a professional reporter style: ${text}` }] }],
+      contents: [{ parts: [{ text: `Read this news brief professionally: ${text}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -180,51 +119,35 @@ export const generateAudioBrief = async (text: string): Promise<string | null> =
         },
       },
     });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    return base64Audio || null;
-  } catch (error) {
-    console.error('TTS Error:', error);
-    return null;
-  }
+    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
+  } catch (error) { return null; }
 };
 
 export const generateVideoTeaser = async (prompt: string, onProgress?: (msg: string) => void): Promise<string | null> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
-    onProgress?.("Initiating video generation...");
+    onProgress?.("Rendering cinematic teaser...");
     let operation = await ai.models.generateVideos({
       model: MODEL_VIDEO,
-      prompt: `Cinematic news teaser video for: ${prompt}. High quality, slow motion, 4k editorial style.`,
-      config: {
-        numberOfVideos: 1,
-        resolution: '720p',
-        aspectRatio: '16:9'
-      }
+      prompt: `News teaser for: ${prompt}. Cinematic, broadcast style.`,
+      config: { numberOfVideos: 1, resolution: '720p', aspectRatio: '16:9' }
     });
-
     while (!operation.done) {
-      onProgress?.("Dreaming up your teaser... This takes about a minute.");
       await new Promise(resolve => setTimeout(resolve, 10000));
       operation = await ai.operations.getVideosOperation({ operation: operation });
     }
-
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!downloadLink) return null;
-
     const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
     const blob = await response.blob();
     return URL.createObjectURL(blob);
-  } catch (error) {
-    console.error('Video Gen Error:', error);
-    return null;
-  }
+  } catch (error) { return null; }
 };
 
 export const generatePostImage = async (postTitle: string): Promise<string | null> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
-    const prompt = `Professional news graphic background for: "${postTitle}". Editorial style, no text.`;
+    const prompt = `Editorial news graphic for: "${postTitle}". No text, abstract high-quality.`;
     const response = await ai.models.generateContent({
       model: MODEL_IMAGE,
       contents: { parts: [{ text: prompt }] },
@@ -234,7 +157,5 @@ export const generatePostImage = async (postTitle: string): Promise<string | nul
       if (part.inlineData) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
     }
     return null;
-  } catch (error) {
-    return null;
-  }
+  } catch (error) { return null; }
 };

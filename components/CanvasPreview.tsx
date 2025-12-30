@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { TemplateType, WPPost, BrandingConfig } from '../types';
 import { TEMPLATE_CONFIGS, APP_LOGO_BASE64 } from '../constants';
 
@@ -36,11 +36,8 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
       const img = new Image();
       img.crossOrigin = "anonymous";
       return new Promise((resolve, reject) => {
-        img.onload = () => {
-          imageCache[url] = img;
-          resolve(img);
-        };
-        img.onerror = () => reject(new Error("Image failed to load"));
+        img.onload = () => { imageCache[url] = img; resolve(img); };
+        img.onerror = () => reject(new Error("Image load failed"));
         img.src = getProxySrc(url);
       });
     };
@@ -53,11 +50,10 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         barColor: branding?.useCustomColors ? branding.primaryColor : baseConfig.barColor,
       };
 
-      const handleText = (brandWebsite || wordpressUrl || 'NEWSROOM.LIVE').toUpperCase();
-
+      const handleText = (brandWebsite || wordpressUrl || 'NEWSFLOW.LIVE').toUpperCase();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 1. Background Image
+      // 1. Background
       try {
         const bgImg = await loadImageCached(post.featuredImageUrl);
         const scale = Math.max(canvas.width / bgImg.width, canvas.height / bgImg.height);
@@ -69,7 +65,7 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      // 2. Overlays & Content
+      // 2. Overlays & Content Variations
       if (template === TemplateType.MODERN_NEWS) {
         const margin = 35;
         const boxWidth = canvas.width - (margin * 2);
@@ -78,8 +74,6 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(margin, rectY, boxWidth, boxHeight);
-        
-        // Lower Third Bar
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, canvas.height - 85, canvas.width, 85);
         
@@ -95,12 +89,8 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         const maxWidth = boxWidth - 100;
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
-          if (ctx.measureText(testLine).width > maxWidth && n > 0) {
-            lines.push(line.trim());
-            line = words[n] + ' ';
-          } else {
-            line = testLine;
-          }
+          if (ctx.measureText(testLine).width > maxWidth && n > 0) { lines.push(line.trim()); line = words[n] + ' '; } 
+          else { line = testLine; }
         }
         lines.push(line.trim());
         let currentTitleY = rectY + 115;
@@ -109,8 +99,6 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
           ctx.fillText(l, canvas.width / 2, currentTitleY);
           currentTitleY += 90;
         });
-        
-        // Handle In Lower Third
         ctx.fillStyle = '#ffffff';
         ctx.font = '800 32px Inter';
         ctx.fillText(handleText, canvas.width / 2, canvas.height - 35);
@@ -118,10 +106,8 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
       } else if (template === TemplateType.MINIMALIST) {
         ctx.fillStyle = `rgba(255, 255, 255, ${config.overlayOpacity})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, 0, 15, canvas.height);
-        
         ctx.fillStyle = '#0f172a';
         ctx.font = '800 72px Inter';
         ctx.textAlign = 'left';
@@ -131,19 +117,11 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         const maxWidth = canvas.width - 160;
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
-          if (ctx.measureText(testLine).width > maxWidth && n > 0) {
-            ctx.fillStyle = '#0f172a';
-            ctx.fillText(line.trim(), 80, currentY);
-            currentY += 90;
-            line = words[n] + ' ';
-          } else {
-            line = testLine;
-          }
+          if (ctx.measureText(testLine).width > maxWidth && n > 0) { ctx.fillText(line.trim(), 80, currentY); currentY += 90; line = words[n] + ' '; } 
+          else { line = testLine; }
         }
         ctx.fillStyle = config.accentColor;
         ctx.fillText(line.trim(), 80, currentY);
-
-        // Footer Handle
         ctx.fillStyle = config.barColor;
         ctx.font = '800 24px Inter';
         ctx.fillText(handleText, 80, canvas.height - 60);
@@ -151,14 +129,11 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
       } else if (template === TemplateType.BREAKING_NEWS) {
         ctx.fillStyle = `rgba(220, 38, 38, ${config.overlayOpacity})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, canvas.height - 240, canvas.width, 240);
-        
         ctx.fillStyle = config.accentColor;
         ctx.font = '900 48px Inter';
         ctx.fillText('BREAKING NEWS', 60, canvas.height - 170);
-        
         ctx.fillStyle = '#ffffff';
         ctx.font = '800 64px Inter';
         const words = post.title.split(' ');
@@ -167,19 +142,11 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         const lines: string[] = [];
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
-          if (ctx.measureText(testLine).width > canvas.width - 120 && n > 0) {
-            lines.push(line);
-            line = words[n] + ' ';
-          } else {
-            line = testLine;
-          }
+          if (ctx.measureText(testLine).width > canvas.width - 120 && n > 0) { lines.push(line); line = words[n] + ' '; } 
+          else { line = testLine; }
         }
         lines.push(line);
-        lines.slice(0, 2).reverse().forEach((l, i) => {
-           ctx.fillText(l.trim(), 60, currentY - (i * 75));
-        });
-
-        // Ticker-style Handle
+        lines.slice(0, 2).reverse().forEach((l, i) => { ctx.fillText(l.trim(), 60, currentY - (i * 75)); });
         ctx.fillStyle = config.accentColor;
         ctx.font = '900 28px Inter';
         ctx.textAlign = 'right';
@@ -187,20 +154,10 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         ctx.textAlign = 'left';
 
       } else {
-        // STANDARD / DYNAMIC TEMPLATE
         ctx.fillStyle = `rgba(0, 0, 0, ${config.overlayOpacity})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Custom Lower Third Bar
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
-
-        if (branding?.useCustomColors) {
-            ctx.strokeStyle = config.barColor;
-            ctx.lineWidth = 20;
-            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-        }
-
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 68px Inter';
         ctx.textAlign = 'left';
@@ -210,20 +167,11 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         const lines: string[] = [];
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
-          if (ctx.measureText(testLine).width > canvas.width - 120 && n > 0) {
-            lines.push(line);
-            line = words[n] + ' ';
-          } else {
-            line = testLine;
-          }
+          if (ctx.measureText(testLine).width > canvas.width - 120 && n > 0) { lines.push(line); line = words[n] + ' '; } 
+          else { line = testLine; }
         }
         lines.push(line);
-        lines.reverse().forEach((l, i) => {
-          ctx.fillStyle = (i === 0) ? config.accentColor : '#ffffff';
-          ctx.fillText(l.trim(), 60, currentY - (i * 85));
-        });
-
-        // Footer Handle
+        lines.reverse().forEach((l, i) => { ctx.fillStyle = (i === 0) ? config.accentColor : '#ffffff'; ctx.fillText(l.trim(), 60, currentY - (i * 85)); });
         ctx.fillStyle = '#ffffff';
         ctx.font = '900 32px Inter';
         ctx.textAlign = 'center';
@@ -231,32 +179,24 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
         ctx.textAlign = 'left';
       }
 
-      // 3. Logo Rendering with Transparency & Shadow Support
+      // 3. Transparent PNG Logo with Adaptive Shadow
       try {
-        const logoToUse = (logoUrl && logoUrl.trim() !== "") 
-          ? logoUrl 
-          : (baseConfig.defaultLogo || APP_LOGO_BASE64);
-
+        const logoToUse = (logoUrl && logoUrl.trim() !== "") ? logoUrl : (baseConfig.defaultLogo || APP_LOGO_BASE64);
         const logo = await loadImageCached(logoToUse);
         const logoHeight = template === TemplateType.MINIMALIST ? 80 : 120;
         const logoWidth = (logo.width / logo.height) * logoHeight;
         
-        ctx.save(); // Save state to apply shadow only to logo
-        
-        // Professional drop-shadow for transparent PNG visibility
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-        ctx.shadowBlur = 15;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 4;
-
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+        ctx.shadowBlur = 18;
+        ctx.shadowOffsetX = 4;
+        ctx.shadowOffsetY = 6;
         if (template === TemplateType.MINIMALIST) {
           ctx.drawImage(logo, canvas.width - logoWidth - 60, 60, logoWidth, logoHeight);
         } else {
-          // Direct drawing without the white backing block
           ctx.drawImage(logo, 40, 40, Math.min(logoWidth, 420), logoHeight);
         }
-        
-        ctx.restore(); // Restore state to clean up shadow
+        ctx.restore();
       } catch (e) {}
 
       if (onExport) onExport(canvas.toDataURL('image/png'));
@@ -265,7 +205,7 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({ post, template, logoUrl, 
   }, [post, template, logoUrl, wordpressUrl, brandWebsite, branding, onExport]);
 
   return (
-    <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-900 border-4 border-white aspect-square w-full">
+    <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-slate-900 border-4 border-white aspect-square w-full">
       <canvas ref={canvasRef} width={1080} height={1080} className="w-full h-full" />
     </div>
   );

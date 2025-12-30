@@ -1,7 +1,7 @@
 
-import { TemplateType, ImageSource, WPPost, AppSettings } from './types';
+import { TemplateType, ImageSource, AppSettings } from './types';
 
-export const APP_LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjUwIiB2aWV3Qm94PSIwIDAgMjAwIDUwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iNTAiIHJ4PSI4IiBmaWxsPSIjNDM0RUVGIi8+PHBhdGggZD0iTTE1IDI1TDIyIDE4TDIyIDMyTDE1IDI1WiIgZmlsbD0id2hpdGUiLz48dGV4dCB4PSI0MCIgeT0iMzMiIGZpbGw9IndoaXRlIiBmb250LWZhbWlseT0iSW50ZXIsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSJib2xkIj5ORVdTRkxPVzwvdGV4dD48L3N2Zz4=';
+export const APP_LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjUwIiB2aWV3Qm94PSIwIDAgMjAwIDUwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iNTAiIHJ4PSI4IiBmaWxsPSIjMTExODI3Ii8+PHBhdGggZD0iTTE1IDI1TDIyIDE4TDIyIDMyTDE1IDI1WiIgZmlsbD0id2hpdGUiLz48dGV4dCB4PSI0MCIgeT0iMzMiIGZpbGw9IndoaXRlIiBmb250LWZhbWlseT0iSW50ZXIsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSJib2xkIj5ORVdTRkxPVzwvdGV4dD48L3N2Zz4=';
 
 export const TEMPLATE_CONFIGS = {
   [TemplateType.BREAKING_NEWS]: {
@@ -23,10 +23,9 @@ export const TEMPLATE_CONFIGS = {
   [TemplateType.MINIMALIST]: {
     backgroundColor: '#0f172a',
     textColor: '#ffffff',
-    accentColor: '#2dd4bf', // Subtle Teal
+    accentColor: '#2dd4bf',
     barColor: '#1e293b',
-    // High-end white monochrome logo
-    defaultLogo: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjUwIiB2aWV3Qm94PSIwIDAgMjAwIDUwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjx0ZXh0IHg9IjAiIHk9IjMzIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iSW50ZXIsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSI4MDAiPk5FV1NGTE9XPC90ZXh0Pjwvc3ZnPg==',
+    defaultLogo: APP_LOGO_BASE64,
     overlayOpacity: 0.2
   },
   [TemplateType.MODERN_NEWS]: {
@@ -67,14 +66,4 @@ export const DEFAULT_SETTINGS: AppSettings = {
     accentColor: '#f59e0b',
     useCustomColors: false
   }
-};
-
-export const PLACEHOLDER_POST: WPPost = {
-  id: 0,
-  title: "Global Tech Summit 2025: AI Innovations Redefining the Digital Frontier",
-  excerpt: "The annual summit brought together leaders to discuss the rapid evolution of generative models and their impact on global markets...",
-  featuredImageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1080&h=1080",
-  date: new Date().toISOString(),
-  link: "https://example.com/news/tech-summit",
-  author: "Sarah Chen"
 };
