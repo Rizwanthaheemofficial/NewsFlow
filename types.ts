@@ -31,6 +31,8 @@ export interface AccountConnection {
   username?: string;
   avatar?: string;
   lastSync?: string;
+  accessToken?: string;
+  expiresAt?: number;
 }
 
 export interface WPPost {
