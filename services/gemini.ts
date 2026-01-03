@@ -13,9 +13,61 @@ export interface HashtagSet {
   trending: string[];
 }
 
-export const generateHashtags = async (title: string, excerpt: string): Promise<HashtagSet> => {
+export interface VisualHeadlineResult {
+  headline: string;
+  highlights: string[];
+}
+
+export const generateVisualHeadline = async (title: string, excerpt: string): Promise<VisualHeadlineResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Generate 15 SEO-optimized hashtags for a social post about: "${title}". Excerpt: "${excerpt}". Return JSON with niche, broad, and trending arrays.`;
+  const prompt = `Convert this news title into a catchy, short, and punchy headline for a social media graphic. 
+  Original Title: "${title}"
+  Excerpt: "${excerpt}"
+  
+  Requirements:
+  1. Maximum 45 characters.
+  2. Use "Power Words" that grab attention.
+  3. Identify 1 or 2 most important words to highlight visually.
+  
+  Return JSON with 'headline' (string) and 'highlights' (array of strings).`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_TEXT,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            headline: { type: Type.STRING },
+            highlights: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["headline", "highlights"]
+        }
+      }
+    });
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    return { headline: title.substring(0, 45), highlights: [] };
+  }
+};
+
+export const generateHashtags = async (title: string, excerpt: string, brandName: string): Promise<HashtagSet> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const prompt = `Generate 15 SEO-optimized hashtags for a social post.
+  Topic: "${title}"
+  Context: "${excerpt}"
+  Brand Name: "${brandName}"
+  
+  Requirements:
+  1. Generate a mix of hashtags: 
+     - Niche: Highly specific to the content.
+     - Broad: General category tags.
+     - Trending: High-volume related tags.
+  2. Ensure some hashtags creatively incorporate or relate the brand name "${brandName}" to the topic.
+  
+  Return JSON with niche, broad, and trending arrays.`;
 
   try {
     const response = await ai.models.generateContent({

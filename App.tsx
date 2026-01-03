@@ -17,6 +17,7 @@ import {
   generateAudioBrief, 
   generateVideoTeaser,
   generatePostImage,
+  generateVisualHeadline,
   HashtagSet
 } from './services/gemini';
 import { publishToPlatform } from './services/socialMedia';
@@ -41,7 +42,12 @@ import {
   ExternalLink,
   Upload,
   X,
-  Image as ImageIcon
+  Download,
+  Share,
+  WifiOff,
+  Zap,
+  Copy,
+  Check
 } from 'lucide-react';
 
 /**
@@ -61,6 +67,8 @@ const App: React.FC = () => {
   const [hashtags, setHashtags] = useState<HashtagSet | null>(null);
   const [score, setScore] = useState<PerformanceScore | null>(null);
   const [logs, setLogs] = useState<PublishLog[]>([]);
+  const [exportedImageUrl, setExportedImageUrl] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,6 +100,7 @@ const App: React.FC = () => {
     setCaptions(null);
     setHashtags(null);
     setScore(null);
+    setExportedImageUrl(null);
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,28 +119,33 @@ const App: React.FC = () => {
 
   const handleGenerateAI = async () => {
     if (!selectedPost) return;
-    setGenerating('Processing AI Content...');
+    setGenerating('Processing Catchy AI Content...');
     try {
-      // 1. Generate core captions and specialized hashtags in parallel
-      const [newCaptions, newHashtags] = await Promise.all([
+      const brandName = settings.brandWebsite || 'NewsFlow';
+      const [newCaptions, newHashtags, visualData] = await Promise.all([
         generateSocialCaption(selectedPost.title, selectedPost.excerpt || '', selectedPost.link, settings.aiConfig),
-        generateHashtags(selectedPost.title, selectedPost.excerpt || '')
+        generateHashtags(selectedPost.title, selectedPost.excerpt || '', brandName),
+        generateVisualHeadline(selectedPost.title, selectedPost.excerpt || '')
       ]);
 
-      // 2. Construct the brand-specific hashtag
-      const brandClean = settings.brandWebsite.replace(/[^a-zA-Z0-9]/g, '');
+      // Update the selected post with visual headline data
+      setSelectedPost({
+        ...selectedPost,
+        visualHeadline: visualData.headline,
+        highlightWords: visualData.highlights
+      });
+
+      const brandClean = brandName.replace(/[^a-zA-Z0-9]/g, '');
       const brandTag = `#${brandClean.charAt(0).toUpperCase() + brandClean.slice(1).toLowerCase()}`;
       
-      // 3. Assemble the hashtag string from multiple AI-generated categories
       const hashtagPool = [
         brandTag,
         ...newHashtags.niche.slice(0, 3).map(h => h.startsWith('#') ? h : `#${h.replace(/\s+/g, '')}`),
         ...newHashtags.broad.slice(0, 2).map(h => h.startsWith('#') ? h : `#${h.replace(/\s+/g, '')}`),
         ...newHashtags.trending.slice(0, 2).map(h => h.startsWith('#') ? h : `#${h.replace(/\s+/g, '')}`)
       ];
-      const hashtagString = hashtagPool.join(' ');
+      const hashtagString = Array.from(new Set(hashtagPool.filter(h => h.length > 1))).join(' ');
 
-      // 4. Enrich platform-specific captions with the hashtag block
       const enrichedCaptions: ContentVariations = {
         [Platform.FACEBOOK]: `${newCaptions[Platform.FACEBOOK]}\n\n${hashtagString}`,
         [Platform.INSTAGRAM]: `${newCaptions[Platform.INSTAGRAM]}\n\n${hashtagString}`,
@@ -142,7 +156,6 @@ const App: React.FC = () => {
       setCaptions(enrichedCaptions);
       setHashtags(newHashtags);
       
-      // 5. Predict performance based on the primary broadcast channel (Facebook fallback)
       const newScore = await predictPerformance(selectedPost.title, enrichedCaptions[Platform.FACEBOOK]);
       setScore(newScore);
     } catch (e) {
@@ -154,6 +167,12 @@ const App: React.FC = () => {
 
   const handleGenerateMedia = async (type: 'image' | 'audio' | 'video') => {
     if (!selectedPost) return;
+
+    // Data Saving confirmation for heavy assets
+    if (settings.dataSavingMode && (type === 'video' || type === 'audio')) {
+      if (!confirm(`Data Saving Mode is active. Generating ${type} consumes significant bandwidth. Continue?`)) return;
+    }
+
     setGenerating(`Generating ${type}...`);
     try {
       if (type === 'image') {
@@ -163,7 +182,6 @@ const App: React.FC = () => {
         const data = await generateAudioBrief(selectedPost.title + ". " + selectedPost.excerpt);
         if (data) setSelectedPost({ ...selectedPost, audioUrl: `data:audio/pcm;base64,${data}` });
       } else if (type === 'video') {
-        // Handle Veo API Key requirement
         if (!(await (window as any).aistudio.hasSelectedApiKey())) {
           await (window as any).aistudio.openSelectKey();
         }
@@ -174,6 +192,68 @@ const App: React.FC = () => {
       console.error(`${type} Generation Error:`, e);
     } finally {
       setGenerating(null);
+    }
+  };
+
+  const handleDownloadImage = () => {
+    if (!exportedImageUrl) return;
+    const link = document.createElement('a');
+    link.download = `worldnews-broadcast-${Date.now()}.png`;
+    link.href = exportedImageUrl;
+    link.click();
+  };
+
+  const handleCopyCaption = async () => {
+    if (!captions) return;
+    const textToCopy = `${captions[Platform.FACEBOOK]}\n\nSource: ${selectedPost?.link}`;
+    await navigator.clipboard.writeText(textToCopy);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleSharePost = async () => {
+    if (!selectedPost) {
+      alert("Please select a post first.");
+      return;
+    }
+
+    const captionText = captions ? captions[Platform.FACEBOOK] : `${selectedPost.title}\n\nRead more at: ${selectedPost.link}`;
+    
+    // Preparation of share data
+    const shareData: any = {
+      title: 'World News Today Live - Broadcast',
+      text: captionText,
+      url: selectedPost.link,
+    };
+
+    try {
+      // Check for Native Web Share API
+      if (navigator.share) {
+        // Prepare image file if canvas export is available
+        if (exportedImageUrl) {
+          const res = await fetch(exportedImageUrl);
+          const blob = await res.blob();
+          const file = new File([blob], 'broadcast.png', { type: 'image/png' });
+          
+          // Check if file sharing is specifically supported
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            shareData.files = [file];
+          }
+        }
+        
+        await navigator.share(shareData);
+      } else {
+        // Fallback: Clipboard
+        await handleCopyCaption();
+        alert("Native sharing not supported on this browser. Headline, link and hashtags have been copied to your clipboard!");
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error("Sharing failed:", err);
+        // Secondary Fallback
+        await handleCopyCaption();
+        alert("Sharing failed. Content has been copied to your clipboard instead.");
+      }
     }
   };
 
@@ -322,7 +402,7 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                   {/* Canvas & Media Controls */}
                   <div className="space-y-6">
-                    <div className="bg-white p-4 rounded-[3rem] shadow-xl border border-slate-100">
+                    <div className="bg-white p-4 rounded-[3rem] shadow-xl border border-slate-100 relative group">
                        <CanvasPreview 
                          post={selectedPost} 
                          template={settings.selectedTemplate}
@@ -330,7 +410,24 @@ const App: React.FC = () => {
                          brandWebsite={settings.brandWebsite}
                          branding={settings.branding}
                          logoUrl={settings.logoUrl}
+                         onExport={setExportedImageUrl}
+                         lowDataMode={settings.dataSavingMode}
                        />
+                       
+                       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white/90 backdrop-blur p-2 rounded-2xl border border-slate-200 shadow-2xl translate-y-2 group-hover:translate-y-0">
+                          <button 
+                            onClick={handleDownloadImage}
+                            className="p-3 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-2 font-bold text-xs"
+                          >
+                            <Download size={16} /> Save PNG
+                          </button>
+                          <button 
+                            onClick={handleSharePost}
+                            className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 font-bold text-xs"
+                          >
+                            <Share size={16} /> Quick Share
+                          </button>
+                       </div>
                     </div>
                     
                     <div className="bg-slate-900 rounded-[2.5rem] p-6 text-white space-y-4 shadow-2xl">
@@ -372,7 +469,15 @@ const App: React.FC = () => {
                       {captions ? (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                            <div className="space-y-2">
-                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Caption</label>
+                              <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Caption</label>
+                                <button 
+                                  onClick={handleCopyCaption}
+                                  className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-tighter transition-all ${isCopied ? 'text-emerald-500' : 'text-indigo-600 hover:text-indigo-700'}`}
+                                >
+                                  {isCopied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy Text</>}
+                                </button>
+                              </div>
                               <textarea 
                                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium leading-relaxed min-h-[120px] outline-none focus:border-indigo-500"
                                 value={captions[Platform.FACEBOOK]} 
@@ -393,9 +498,8 @@ const App: React.FC = () => {
                              <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AI Hashtag Matrix</label>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {/* Showing the brand hashtag first */}
                                   <span className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-black">
-                                    #{settings.brandWebsite.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}
+                                    #{ (settings.brandWebsite || 'NewsFlow').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}
                                   </span>
                                   {hashtags.niche.concat(hashtags.trending).slice(0, 8).map((h, i) => (
                                     <span key={i} className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold">#{h}</span>
@@ -416,7 +520,13 @@ const App: React.FC = () => {
                                       <p className="text-xs font-black">{score.label}</p>
                                     </div>
                                   </div>
-                                  <BarChart3 size={20} className="text-white/20" />
+                                  <button 
+                                    onClick={handleSharePost}
+                                    className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all"
+                                    title="External Share"
+                                  >
+                                    <Share size={18} />
+                                  </button>
                                </div>
                                <p className="text-[10px] text-white/60 leading-relaxed italic">"{score.reasoning[0]}"</p>
                              </div>
@@ -430,23 +540,35 @@ const App: React.FC = () => {
                       )}
                     </div>
 
-                    <button 
-                      onClick={handlePublish}
-                      disabled={!captions || !!generating}
-                      className="w-full py-6 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-indigo-100 flex items-center justify-center gap-4 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:scale-100"
-                    >
-                      {generating ? (
-                        <>
-                          <Loader2 className="animate-spin" />
-                          <span className="text-base uppercase tracking-widest">{generating}</span>
-                        </>
-                      ) : (
-                        <>
-                          Broadcast Live
-                          <ArrowRight size={24} />
-                        </>
+                    <div className="flex flex-col gap-4">
+                      <button 
+                        onClick={handlePublish}
+                        disabled={!captions || !!generating}
+                        className="w-full py-6 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-indigo-100 flex items-center justify-center gap-4 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:scale-100"
+                      >
+                        {generating ? (
+                          <>
+                            <Loader2 className="animate-spin" />
+                            <span className="text-base uppercase tracking-widest">{generating}</span>
+                          </>
+                        ) : (
+                          <>
+                            Broadcast Live
+                            <ArrowRight size={24} />
+                          </>
+                        )}
+                      </button>
+                      
+                      {captions && (
+                         <button 
+                          onClick={handleSharePost}
+                          className="w-full py-4 bg-white border-2 border-slate-100 text-slate-900 rounded-[1.5rem] font-black text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-all active:scale-95"
+                        >
+                          <Share2 size={18} className="text-indigo-600" />
+                          Share Externally
+                        </button>
                       )}
-                    </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -456,7 +578,7 @@ const App: React.FC = () => {
       )}
 
       {activeTab === 'settings' && (
-        <div className="max-w-5xl mx-auto space-y-10">
+        <div className="max-w-5xl mx-auto space-y-10 pb-40">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-8">
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
@@ -490,9 +612,30 @@ const App: React.FC = () => {
 
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                 <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3">
-                  <Palette className="text-indigo-600" /> Branding Config
+                  <Palette className="text-indigo-600" /> Branding & Optimization
                 </h3>
                 <div className="space-y-6">
+                  {/* Data Saving Option */}
+                  <div className={`p-5 rounded-2xl border-2 transition-all ${settings.dataSavingMode ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${settings.dataSavingMode ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                           {settings.dataSavingMode ? <WifiOff size={20} /> : <Zap size={20} />}
+                         </div>
+                         <div>
+                           <p className="text-xs font-black text-slate-900 uppercase tracking-widest">Data Saving Mode</p>
+                           <p className="text-[10px] font-bold text-slate-400">Reduce quality to save bandwidth</p>
+                         </div>
+                      </div>
+                      <button 
+                        onClick={() => setSettings({ ...settings, dataSavingMode: !settings.dataSavingMode })}
+                        className={`w-12 h-6 rounded-full relative transition-all ${settings.dataSavingMode ? 'bg-amber-500' : 'bg-slate-300'}`}
+                      >
+                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.dataSavingMode ? 'right-1' : 'left-1'}`} />
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Custom Logo Upload Section */}
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Brand Mark (PNG only)</label>

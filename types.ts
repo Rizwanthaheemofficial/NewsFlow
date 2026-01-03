@@ -46,6 +46,8 @@ export interface WPPost {
   aiImageUrl?: string;
   audioUrl?: string;
   videoUrl?: string;
+  visualHeadline?: string;
+  highlightWords?: string[];
 }
 
 export interface PerformanceScore {
@@ -114,6 +116,7 @@ export interface AppSettings {
   logoUrl?: string;
   aiConfig: AIConfig;
   branding: BrandingConfig;
+  dataSavingMode: boolean;
 }
 
 export interface SystemStats {
