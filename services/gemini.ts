@@ -61,11 +61,7 @@ export const generateHashtags = async (title: string, excerpt: string, brandName
   Brand Name: "${brandName}"
   
   Requirements:
-  1. Generate a mix of hashtags: 
-     - Niche: Highly specific to the content.
-     - Broad: General category tags.
-     - Trending: High-volume related tags.
-  2. Ensure some hashtags creatively incorporate or relate the brand name "${brandName}" to the topic.
+  1. Generate niche, broad, and trending arrays.
   
   Return JSON with niche, broad, and trending arrays.`;
 
@@ -102,7 +98,7 @@ export const generateSocialCaption = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const selectedTone = toneOverride || config.brandVoice;
   
-  const prompt = `Write 4 unique social captions for: "${postTitle}". Excerpt: "${excerpt}". Link: "${postLink}". Voice: ${selectedTone}. Language: ${config.targetLanguage}. Return JSON with Facebook, Instagram, Twitter, LinkedIn keys.`;
+  const prompt = `Write 4 social captions for: "${postTitle}". Excerpt: "${excerpt}". Link: "${postLink}". Voice: ${selectedTone}. Language: ${config.targetLanguage}. Return JSON with Facebook, Instagram, Twitter, LinkedIn keys.`;
   
   try {
     const response = await ai.models.generateContent({
@@ -110,6 +106,7 @@ export const generateSocialCaption = async (
       contents: prompt,
       config: {
         temperature: config.creativity,
+        tools: config.useGrounding ? [{ googleSearch: {} }] : undefined,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -178,14 +175,15 @@ export const generateAudioBrief = async (text: string): Promise<string | null> =
 export const generateVideoTeaser = async (prompt: string, onProgress?: (msg: string) => void): Promise<string | null> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
-    onProgress?.("Rendering cinematic teaser...");
+    onProgress?.("Contacting Veo Engine...");
     let operation = await ai.models.generateVideos({
       model: MODEL_VIDEO,
       prompt: `News teaser for: ${prompt}. Cinematic, broadcast style.`,
       config: { numberOfVideos: 1, resolution: '720p', aspectRatio: '16:9' }
     });
     while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      onProgress?.("Rendering cinematic layers...");
+      await new Promise(resolve => setTimeout(resolve, 8000));
       operation = await ai.operations.getVideosOperation({ operation: operation });
     }
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
