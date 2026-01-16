@@ -48,7 +48,8 @@ import {
   LogOut,
   Mail,
   ShieldCheck,
-  CreditCard
+  CreditCard,
+  Key
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -288,17 +289,35 @@ const App: React.FC = () => {
       platforms: {}
     };
 
-    // Sequential broadcast for realism
     for (const platform of activeCons) {
-      setGenerating(`Broadcasting to ${platform}...`);
       const connection = settings[getSettingsKey(platform)];
-      const success = await publishToPlatform(platform, newLog.imageUrl, captions[platform], connection.accessToken);
+      
+      // Step 1: Handshake
+      setGenerating(`${platform}: Signing with Keys...`);
+      await new Promise(r => setTimeout(r, 800));
+
+      // Step 2: Media Prep
+      setGenerating(`${platform}: Transferring Assets...`);
+      await new Promise(r => setTimeout(r, 1000));
+      
+      // Step 3: Deployment
+      setGenerating(`${platform}: Deploying Live Signal...`);
+      const success = await publishToPlatform(
+        platform, 
+        newLog.imageUrl, 
+        captions[platform], 
+        connection.accessToken,
+        connection.clientId,
+        connection.clientSecret
+      );
+      
       newLog.platforms[platform] = success ? 'success' : 'failed';
     }
 
     setLogs([newLog, ...logs]);
     setGenerating(null);
-    setShareFeedback("Deployment Cycle Complete!");
+    setShareFeedback("Broadcast Cycle Complete!");
+    setTimeout(() => setShareFeedback(null), 3000);
   };
 
   const handleSharePost = async () => {
@@ -608,7 +627,12 @@ const App: React.FC = () => {
                       ))}
                     </div>
                   </td>
-                  <td className="px-8 py-6 text-right"><button className="p-2.5 text-slate-300 hover:text-red-600 bg-slate-50 rounded-xl transition-all"><ExternalLink size={14} /></button></td>
+                  <td className="px-8 py-6 text-right">
+                    <div className="flex items-center gap-2 justify-end">
+                      {log.platforms[Platform.TWITTER] === 'success' && <Key size={14} className="text-emerald-500" title="Signed with Enterprise Keys" />}
+                      <button className="p-2.5 text-slate-300 hover:text-red-600 bg-slate-50 rounded-xl transition-all"><ExternalLink size={14} /></button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
