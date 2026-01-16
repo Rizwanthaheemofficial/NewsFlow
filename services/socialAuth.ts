@@ -23,8 +23,42 @@ export const clearConnection = (platform: Platform) => {
 };
 
 /**
- * SOCIAL INTEGRATION ENGINE
- * Simulates a real OAuth window flow with postMessage communication.
+ * Simulates an API handshake to verify a manually entered enterprise token or credentials.
+ */
+export const verifyManualToken = async (
+  platform: Platform, 
+  token: string, 
+  clientId?: string, 
+  clientSecret?: string
+): Promise<AccountConnection> => {
+  // Real-world validation simulation
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  if (platform === Platform.TWITTER) {
+    if (!clientId || !clientSecret) {
+      throw new Error('Twitter Enterprise requires both Client ID and Client Secret.');
+    }
+  } else if (!token || token.length < 10) {
+    throw new Error('Invalid token format. Enterprise tokens must be at least 10 characters.');
+  }
+
+  const mockData: AccountConnection = {
+    isConnected: true,
+    username: platform === Platform.TWITTER ? 'X_News_Engine' : `${platform}_Admin_Bot`,
+    avatar: `https://ui-avatars.com/api/?name=${platform}&background=random`,
+    lastSync: new Date().toLocaleString(),
+    accessToken: token || `manual_${platform}_${Math.random().toString(36).substr(2, 9)}`,
+    clientId,
+    clientSecret,
+    expiresAt: Date.now() + (365 * 24 * 60 * 60 * 1000) // 1 year for service accounts
+  };
+
+  saveConnection(platform, mockData);
+  return mockData;
+};
+
+/**
+ * SOCIAL INTEGRATION ENGINE (OAuth)
  */
 export const initiateSocialConnection = async (platform: Platform): Promise<AccountConnection> => {
   const width = 600;
@@ -32,7 +66,6 @@ export const initiateSocialConnection = async (platform: Platform): Promise<Acco
   const left = window.screenX + (window.outerWidth - width) / 2;
   const top = window.screenY + (window.outerHeight - height) / 2;
 
-  // Real-world SaaS auth simulation
   const authUrl = `data:text/html;charset=utf-8,${encodeURIComponent(`
     <!DOCTYPE html>
     <html>

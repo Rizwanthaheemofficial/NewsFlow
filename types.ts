@@ -32,6 +32,8 @@ export interface AccountConnection {
   avatar?: string;
   lastSync?: string;
   accessToken?: string;
+  clientId?: string;
+  clientSecret?: string;
   expiresAt?: number;
 }
 

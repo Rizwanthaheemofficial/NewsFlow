@@ -185,6 +185,13 @@ const App: React.FC = () => {
     }
   };
 
+  const handleManualConnectionUpdate = (platform: Platform, connection: AccountConnection) => {
+    setSettings(prev => ({
+      ...prev,
+      [getSettingsKey(platform)]: connection
+    }));
+  };
+
   const handleDisconnectAccount = (platform: Platform) => {
     clearConnection(platform);
     setSettings(prev => ({
@@ -499,7 +506,14 @@ const App: React.FC = () => {
            </div>
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
               {[Platform.FACEBOOK, Platform.INSTAGRAM, Platform.TWITTER, Platform.LINKEDIN].map(p => (
-                <ConnectionCard key={p} platform={p} connection={settings[getSettingsKey(p)]} onConnect={() => handleConnectAccount(p)} onDisconnect={() => handleDisconnectAccount(p)} />
+                <ConnectionCard 
+                  key={p} 
+                  platform={p} 
+                  connection={settings[getSettingsKey(p)]} 
+                  onConnect={() => handleConnectAccount(p)} 
+                  onDisconnect={() => handleDisconnectAccount(p)} 
+                  onManualConnect={(conn) => handleManualConnectionUpdate(p, conn)}
+                />
               ))}
            </div>
         </div>
