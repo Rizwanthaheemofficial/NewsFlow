@@ -20,7 +20,7 @@ import {
   generateVisualHeadline,
   HashtagSet
 } from './services/gemini';
-import { initiateSocialConnection, getStoredConnections, clearConnection } from './services/socialAuth';
+import { initiateSocialConnection, getStoredConnections, clearConnection, finalizeSocialConnection } from './services/socialAuth';
 import { publishToPlatform } from './services/socialMedia';
 import { 
   Globe, 
@@ -84,6 +84,43 @@ const App: React.FC = () => {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
+  // --- EFFECTS ---
+  useEffect(() => {
+    // HANDLE OAUTH CALLBACK FROM SOCIAL PLATFORMS
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+
+    if (code && state) {
+      setGenerating('Finalizing Social Link...');
+      finalizeSocialConnection(code, state).then(conn => {
+        if (conn) {
+          const connections = getStoredConnections();
+          setSettings(prev => ({
+            ...prev,
+            fbConnection: connections[Platform.FACEBOOK] || prev.fbConnection,
+            igConnection: connections[Platform.INSTAGRAM] || prev.igConnection,
+            xConnection: connections[Platform.TWITTER] || prev.xConnection,
+            liConnection: connections[Platform.LINKEDIN] || prev.liConnection,
+          }));
+          setShareFeedback('Account Linked Successfully!');
+          setActiveTab('settings');
+        }
+        setGenerating(null);
+        // Clean URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) loadPosts();
+  }, [user, settings.wordpressUrl]);
+
+  useEffect(() => {
+    localStorage.setItem('newsflow_settings', JSON.stringify(settings));
+  }, [settings]);
+
   const stats: SystemStats = {
     todayPosts: logs.filter(l => new Date(l.timestamp).toDateString() === new Date().toDateString()).length,
     totalPosts: logs.length,
@@ -92,15 +129,6 @@ const App: React.FC = () => {
     estimatedSavings: 1250 + (logs.length * 45),
     totalEngagement: 85400 + (logs.length * 320)
   };
-
-  // --- EFFECTS ---
-  useEffect(() => {
-    if (user) loadPosts();
-  }, [user, settings.wordpressUrl]);
-
-  useEffect(() => {
-    localStorage.setItem('newsflow_settings', JSON.stringify(settings));
-  }, [settings]);
 
   // --- HANDLERS ---
   const loadPosts = async () => {
@@ -175,11 +203,8 @@ const App: React.FC = () => {
 
   const handleConnectAccount = async (platform: Platform) => {
     try {
-      const connection = await initiateSocialConnection(platform);
-      setSettings(prev => ({
-        ...prev,
-        [getSettingsKey(platform)]: connection
-      }));
+      await initiateSocialConnection(platform);
+      // Window will redirect to login page
     } catch (error) {
       alert(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
@@ -292,16 +317,13 @@ const App: React.FC = () => {
     for (const platform of activeCons) {
       const connection = settings[getSettingsKey(platform)];
       
-      // Step 1: Handshake
-      setGenerating(`${platform}: Signing with Keys...`);
+      setGenerating(`${platform}: Handshaking social API...`);
       await new Promise(r => setTimeout(r, 800));
 
-      // Step 2: Media Prep
-      setGenerating(`${platform}: Transferring Assets...`);
+      setGenerating(`${platform}: Uploading media bundle...`);
       await new Promise(r => setTimeout(r, 1000));
       
-      // Step 3: Deployment
-      setGenerating(`${platform}: Deploying Live Signal...`);
+      setGenerating(`${platform}: Finalizing node sync...`);
       const success = await publishToPlatform(
         platform, 
         newLog.imageUrl, 
