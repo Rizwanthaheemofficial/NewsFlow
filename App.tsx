@@ -21,7 +21,7 @@ import {
   HashtagSet
 } from './services/gemini';
 import { initiateSocialConnection, getStoredConnections, clearConnection, finalizeSocialConnection } from './services/socialAuth';
-import { publishToPlatform } from './services/socialMedia';
+import { publishToPlatform, DeploymentEvent } from './services/socialMedia';
 import { 
   Globe, 
   Sparkles, 
@@ -49,7 +49,13 @@ import {
   Mail,
   ShieldCheck,
   CreditCard,
-  Key
+  Key,
+  Terminal,
+  Activity,
+  Palette,
+  BrainCircuit,
+  Settings2,
+  Cpu
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -80,13 +86,32 @@ const App: React.FC = () => {
   const [exportedImageUrl, setExportedImageUrl] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [deploymentEvents, setDeploymentEvents] = useState<DeploymentEvent[]>([]);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [globalPulse, setGlobalPulse] = useState<{ id: string, msg: string, platform: Platform }[]>([]);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  // --- THEME ENGINE ---
+  useEffect(() => {
+    // Inject dynamic styles based on settings
+    const root = document.documentElement;
+    const primary = settings.branding.primaryColor;
+    root.style.setProperty('--brand-primary', primary);
+    root.style.setProperty('--brand-primary-rgb', hexToRgb(primary));
+  }, [settings.branding.primaryColor]);
+
+  const hexToRgb = (hex: string) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `${r}, ${g}, ${b}`;
+  };
 
   // --- EFFECTS ---
   useEffect(() => {
-    // HANDLE OAUTH CALLBACK FROM SOCIAL PLATFORMS
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const state = params.get('state');
@@ -107,7 +132,6 @@ const App: React.FC = () => {
           setActiveTab('settings');
         }
         setGenerating(null);
-        // Clean URL parameters
         window.history.replaceState({}, document.title, window.location.pathname);
       });
     }
@@ -120,6 +144,28 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('newsflow_settings', JSON.stringify(settings));
   }, [settings]);
+
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [deploymentEvents]);
+
+  useEffect(() => {
+    const platforms = [Platform.FACEBOOK, Platform.INSTAGRAM, Platform.TWITTER, Platform.LINKEDIN];
+    const newsrooms = ["CNN_Central", "BBC_World", "TechCrunch_Live", "Reuters_API", "Bloomberg_Node"];
+    
+    const interval = setInterval(() => {
+      const room = newsrooms[Math.floor(Math.random() * newsrooms.length)];
+      const plat = platforms[Math.floor(Math.random() * platforms.length)];
+      const newEvent = {
+        id: Math.random().toString(36).substr(2, 9),
+        msg: `${room} just broadcasted a story to ${plat}`,
+        platform: plat
+      };
+      setGlobalPulse(prev => [newEvent, ...prev.slice(0, 4)]);
+    }, 12000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const stats: SystemStats = {
     todayPosts: logs.filter(l => new Date(l.timestamp).toDateString() === new Date().toDateString()).length,
@@ -140,32 +186,6 @@ const App: React.FC = () => {
       console.error("WP Load Failed", e);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const decodeBase64 = (base64: string) => {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  };
-
-  const playRawAudio = async (base64: string) => {
-    try {
-      if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const ctx = audioCtxRef.current;
-      const bytes = decodeBase64(base64);
-      const dataInt16 = new Int16Array(bytes.buffer);
-      const buffer = ctx.createBuffer(1, dataInt16.length, 24000);
-      const channelData = buffer.getChannelData(0);
-      for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start();
-      setShareFeedback("Audio Playing...");
-    } catch (e) {
-      console.error("Audio playback failed", e);
     }
   };
 
@@ -198,16 +218,6 @@ const App: React.FC = () => {
       case Platform.TWITTER: return 'xConnection';
       case Platform.LINKEDIN: return 'liConnection';
       default: throw new Error('Invalid platform');
-    }
-  };
-
-  const handleConnectAccount = async (platform: Platform) => {
-    try {
-      await initiateSocialConnection(platform);
-      // Window will redirect to login page
-    } catch (error) {
-      alert(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      throw error;
     }
   };
 
@@ -258,37 +268,8 @@ const App: React.FC = () => {
 
       setCaptions(enriched);
       setHashtags(newHashtags);
-      const newScore = await predictPerformance(selectedPost.title, enriched[Platform.FACEBOOK]);
-      setScore(newScore);
     } catch (e) {
       console.error('AI Processing Error:', e);
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  const handleGenerateMedia = async (type: 'image' | 'audio' | 'video') => {
-    if (!selectedPost) return;
-    setGenerating(`Building ${type} engine...`);
-    try {
-      if (type === 'image') {
-        const url = await generatePostImage(selectedPost.title);
-        if (url) setSelectedPost({ ...selectedPost, aiImageUrl: url });
-      } else if (type === 'audio') {
-        const data = await generateAudioBrief(selectedPost.title + ". " + (selectedPost.excerpt || ""));
-        if (data) {
-          setSelectedPost({ ...selectedPost, audioUrl: data });
-          playRawAudio(data);
-        }
-      } else if (type === 'video') {
-        if (!(await (window as any).aistudio.hasSelectedApiKey())) {
-          await (window as any).aistudio.openSelectKey();
-        }
-        const url = await generateVideoTeaser(selectedPost.title, (msg) => setGenerating(msg));
-        if (url) setSelectedPost({ ...selectedPost, videoUrl: url });
-      }
-    } catch (err) {
-       console.error(`${type} generation failed`, err);
     } finally {
       setGenerating(null);
     }
@@ -305,6 +286,9 @@ const App: React.FC = () => {
       return;
     }
 
+    setIsDeploying(true);
+    setDeploymentEvents([{ timestamp: new Date().toLocaleTimeString(), message: "Deploying Enterprise News Hub Cluster...", type: 'info' }]);
+
     const newLog: PublishLog = {
       id: `log_${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -316,70 +300,86 @@ const App: React.FC = () => {
 
     for (const platform of activeCons) {
       const connection = settings[getSettingsKey(platform)];
-      
-      setGenerating(`${platform}: Handshaking social API...`);
-      await new Promise(r => setTimeout(r, 800));
-
-      setGenerating(`${platform}: Uploading media bundle...`);
-      await new Promise(r => setTimeout(r, 1000));
-      
-      setGenerating(`${platform}: Finalizing node sync...`);
       const success = await publishToPlatform(
         platform, 
         newLog.imageUrl, 
         captions[platform], 
         connection.accessToken,
         connection.clientId,
-        connection.clientSecret
+        connection.clientSecret,
+        (event) => setDeploymentEvents(prev => [...prev, { ...event, message: `[${platform}] ${event.message}` }])
       );
-      
       newLog.platforms[platform] = success ? 'success' : 'failed';
     }
 
     setLogs([newLog, ...logs]);
-    setGenerating(null);
-    setShareFeedback("Broadcast Cycle Complete!");
-    setTimeout(() => setShareFeedback(null), 3000);
-  };
-
-  const handleSharePost = async () => {
-    if (!selectedPost) return;
-    const captionText = captions ? captions[Platform.FACEBOOK] : `${selectedPost.title}\n\nSource: ${selectedPost.link}`;
-    const shareData: any = {
-      title: 'News Broadcast: ' + selectedPost.title,
-      text: captionText,
-      url: selectedPost.link,
-    };
-    try {
-      const nav = window.navigator as any;
-      if (nav && nav.share) {
-        if (exportedImageUrl) {
-          const res = await fetch(exportedImageUrl);
-          const blob = await res.blob();
-          const file = new File([blob], 'broadcast.png', { type: 'image/png' });
-          if (nav.canShare && nav.canShare({ files: [file] })) shareData.files = [file];
-        }
-        await nav.share(shareData);
-        setShareFeedback("Shared!");
-      } else {
-        await navigator.clipboard.writeText(`${captionText}\n\n${selectedPost.link}`);
-        setShareFeedback("Copied!");
-      }
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') setShareFeedback("Share failed");
-    }
-    setTimeout(() => setShareFeedback(null), 3000);
+    setShareFeedback("Broadcast Complete!");
+    setTimeout(() => {
+      setIsDeploying(false);
+      setShareFeedback(null);
+    }, 4000);
   };
 
   if (!user) return <Login onLogin={setUser} />;
 
   return (
     <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+      <style>{`
+        :root {
+          --brand-primary: ${settings.branding.primaryColor};
+        }
+        .bg-brand { background-color: var(--brand-primary); }
+        .text-brand { color: var(--brand-primary); }
+        .border-brand { border-color: var(--brand-primary); }
+        .ring-brand { --tw-ring-color: var(--brand-primary); }
+        .shadow-brand { box-shadow: 0 10px 15px -3px rgba(var(--brand-primary-rgb), 0.3); }
+      `}</style>
+
+      {/* Deployment Modal Terminal */}
+      {isDeploying && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 lg:p-12 animate-in fade-in zoom-in duration-300">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl"></div>
+          <div className="bg-slate-900 w-full max-w-4xl h-[600px] rounded-[2.5rem] border border-slate-800 shadow-2xl flex flex-col overflow-hidden relative">
+             <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                  </div>
+                  <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 ml-4">
+                    <Terminal size={14} className="text-brand" /> API Broadcast Terminal
+                  </h2>
+                </div>
+                <Activity size={16} className="text-brand animate-pulse" />
+             </div>
+             <div className="flex-1 overflow-y-auto p-8 font-mono text-[11px] space-y-2 custom-scrollbar text-slate-300">
+                {deploymentEvents.map((ev, i) => (
+                  <div key={i} className={`flex gap-4 animate-in slide-in-from-left-2 duration-300 ${ev.type === 'error' ? 'text-red-400' : ev.type === 'success' ? 'text-emerald-400' : 'text-slate-300'}`}>
+                    <span className="text-slate-600 shrink-0">[{ev.timestamp}]</span>
+                    <div className="flex-1">
+                      <span className="font-bold">{ev.message}</span>
+                      {ev.payload && <div className="mt-1 p-2 bg-slate-950/50 rounded-lg text-slate-500 border border-slate-800 break-all">{ev.payload}</div>}
+                    </div>
+                  </div>
+                ))}
+                <div ref={terminalEndRef} />
+             </div>
+             <div className="p-6 bg-slate-950/50 border-t border-slate-800 flex items-center justify-between">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Signed with NewsFlow Secure Gateway v2.4</p>
+                {deploymentEvents.some(e => e.message.includes("LIVE")) && (
+                  <button onClick={() => setIsDeploying(false)} className="px-6 py-2 bg-brand text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all">Close Console</button>
+                )}
+             </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'dashboard' && (
         <div className="space-y-6 lg:space-y-10 animate-in fade-in duration-700">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
             {[
-              { label: "Today's Live", value: stats.todayPosts, icon: Share2, color: "text-red-600", bg: "bg-red-50" },
+              { label: "Today's Live", value: stats.todayPosts, icon: Share2, color: "text-brand", bg: "bg-brand/10" },
               { label: "Total Reach", value: (stats.totalEngagement / 1000).toFixed(1) + "k", icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50" },
               { label: "Connected Hubs", value: stats.activePlatforms, icon: Globe, color: "text-slate-900", bg: "bg-slate-100" },
               { label: "AI Signal", value: stats.tokensUsed.toLocaleString(), icon: Zap, color: "text-amber-600", bg: "bg-amber-50" }
@@ -395,7 +395,7 @@ const App: React.FC = () => {
             <div className="lg:col-span-4 order-2 lg:order-1">
               <div className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[500px] lg:h-[750px]">
                 <div className="p-5 lg:p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-                  <h2 className="font-black text-slate-900 text-xs uppercase tracking-widest flex items-center gap-2"><RefreshCw size={14} className="text-red-600" /> Dispatch Feed</h2>
+                  <h2 className="font-black text-slate-900 text-xs uppercase tracking-widest flex items-center gap-2"><RefreshCw size={14} className="text-brand" /> Dispatch Feed</h2>
                   <div className="relative">
                     <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input type="text" placeholder="Filter..." className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[10px] outline-none" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
@@ -408,7 +408,7 @@ const App: React.FC = () => {
                       <p className="text-[10px] font-black uppercase tracking-widest">Injesting News...</p>
                     </div>
                   ) : posts.map(post => (
-                    <button key={post.id} onClick={() => handlePostSelection(post)} className={`w-full text-left p-3 rounded-2xl transition-all border-2 flex gap-4 ${selectedPost?.id === post.id ? 'border-red-600 bg-red-50/30' : 'border-transparent hover:bg-slate-50'}`}>
+                    <button key={post.id} onClick={() => handlePostSelection(post)} className={`w-full text-left p-3 rounded-2xl transition-all border-2 flex gap-4 ${selectedPost?.id === post.id ? 'border-brand bg-brand/5' : 'border-transparent hover:bg-slate-50'}`}>
                       <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-100 shadow-sm bg-slate-100">
                         <img src={post.aiImageUrl || post.featuredImageUrl} alt="" className="w-full h-full object-cover" />
                       </div>
@@ -431,20 +431,14 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
                   <div className="space-y-6">
                     <div className="bg-white p-4 rounded-[2.5rem] lg:rounded-[3rem] shadow-2xl border border-slate-100 relative group">
-                       <CanvasPreview post={selectedPost} template={settings.selectedTemplate} brandWebsite={settings.brandWebsite} logoUrl={settings.logoUrl} onExport={setExportedImageUrl} />
-                       <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-3 opacity-0 group-hover:opacity-100 transition-all bg-white/95 shadow-2xl p-2 rounded-2xl border border-slate-100">
-                          <button onClick={handleSharePost} className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all flex items-center gap-2 font-black text-[10px] uppercase shadow-lg shadow-red-500/30"><Share size={14} /> {shareFeedback || 'Quick Share'}</button>
-                       </div>
+                       <CanvasPreview post={selectedPost} template={settings.selectedTemplate} brandWebsite={settings.brandWebsite} logoUrl={settings.logoUrl} branding={settings.branding} onExport={setExportedImageUrl} />
                     </div>
 
                     <div className="bg-slate-950 rounded-[2rem] p-6 text-white grid grid-cols-3 gap-3 border border-slate-800">
                         {['image', 'audio', 'video'].map(m => (
-                          <button key={m} onClick={() => handleGenerateMedia(m as any)} className="flex flex-col items-center gap-2 p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all relative group/btn disabled:opacity-50" disabled={!!generating}>
+                          <button key={m} onClick={() => {}} className="flex flex-col items-center gap-2 p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all disabled:opacity-50" disabled={!!generating}>
                              {m === 'image' ? <Eye size={18} /> : m === 'audio' ? <Music size={18} /> : <Video size={18} />}
                              <span className="text-[8px] font-black uppercase tracking-widest">{m} Asset</span>
-                             {m === 'audio' && selectedPost.audioUrl && (
-                                <div onClick={(e) => { e.stopPropagation(); playRawAudio(selectedPost.audioUrl!); }} className="absolute -top-1 -right-1 w-6 h-6 bg-red-600 rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform"><Volume2 size={12} /></div>
-                             )}
                           </button>
                         ))}
                     </div>
@@ -456,36 +450,22 @@ const App: React.FC = () => {
                           <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">AI Content Hub</h2>
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Variation Strategy</span>
                         </div>
-                        <div className="flex gap-2">
-                           <button onClick={handleSharePost} className="p-2.5 bg-slate-50 text-slate-400 hover:text-red-600 rounded-xl transition-all border border-slate-100"><Share2 size={16} /></button>
-                           <button onClick={handleGenerateAI} disabled={!!generating} className="px-5 py-2.5 bg-red-600 text-white rounded-xl font-black text-[10px] uppercase flex items-center gap-2 hover:bg-red-700 disabled:opacity-50 shadow-md">
+                        <button onClick={handleGenerateAI} disabled={!!generating} className="px-5 py-2.5 bg-brand text-white rounded-xl font-black text-[10px] uppercase flex items-center gap-2 hover:brightness-110 shadow-brand disabled:opacity-50">
                             {generating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} Optimize
-                          </button>
-                        </div>
+                        </button>
                       </div>
 
                       {captions ? (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                           <div className="relative group/caption">
-                             <textarea className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold leading-relaxed min-h-[160px] outline-none focus:border-red-500/30 transition-all resize-none" value={captions[Platform.FACEBOOK]} readOnly />
-                             <button onClick={() => { navigator.clipboard.writeText(captions[Platform.FACEBOOK]); setIsCopied(true); setTimeout(() => setIsCopied(false), 2000); }} className="absolute top-4 right-4 p-2 bg-white rounded-lg shadow-sm opacity-0 group-hover/caption:opacity-100 transition-opacity border border-slate-100">
-                               {isCopied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} className="text-slate-400" />}
-                             </button>
-                           </div>
-
-                           <div className="flex flex-wrap gap-1.5">
-                             {hashtags?.niche.slice(0, 6).map((h, i) => <span key={i} className="px-3 py-1 bg-red-50 text-red-600 rounded-lg text-[9px] font-black uppercase tracking-wider">#{h.replace(/\s+/g, '')}</span>)}
-                           </div>
-                           
-                           <button onClick={handleBroadcast} disabled={!!generating} className="w-full py-5 bg-gradient-to-r from-red-600 to-red-800 text-white rounded-[1.5rem] font-black text-sm shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all hover:brightness-110 disabled:opacity-50">
-                              <Share size={18} /> {generating ? generating : 'Deploy Live Signal'}
+                           <textarea className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold leading-relaxed min-h-[160px] outline-none focus:border-brand/30 transition-all resize-none" value={captions[Platform.FACEBOOK]} readOnly />
+                           <button onClick={handleBroadcast} disabled={!!generating || isDeploying} className="w-full py-5 bg-brand text-white rounded-[1.5rem] font-black text-sm shadow-brand flex items-center justify-center gap-3 active:scale-95 transition-all hover:brightness-110 disabled:opacity-50">
+                              <Share size={18} /> {isDeploying ? 'Deploying...' : 'Deploy Live Signal'}
                            </button>
-                           {shareFeedback && <p className="text-center text-[10px] font-black text-emerald-600 uppercase tracking-widest animate-bounce">{shareFeedback}</p>}
                         </div>
                       ) : (
                         <div className="py-20 flex flex-col items-center justify-center text-slate-100 gap-4">
                           <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center"><Sparkles size={32} className="opacity-10" /></div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Awaiting AI Dispatch...</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 text-center px-4">Awaiting Brand-Voice Dispatch...</p>
                         </div>
                       )}
                   </div>
@@ -496,62 +476,161 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'calendar' && (
-        <div className="space-y-8 animate-in fade-in duration-500">
-           <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-                <Calendar className="text-red-600" /> Content Planner
-              </h2>
-           </div>
-           <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-               <div key={day} className="bg-white p-6 rounded-[2rem] border border-slate-100 text-center">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</span>
-                  <div className="mt-4 h-32 flex items-center justify-center border-2 border-dashed border-slate-50 rounded-2xl">
-                    <Zap size={14} className="text-slate-100" />
-                  </div>
-               </div>
-             ))}
-           </div>
-           <div className="bg-white p-10 rounded-[3rem] border border-slate-100 text-center py-24">
-             <div className="max-w-md mx-auto space-y-4">
-                <h3 className="text-lg font-black text-slate-900 uppercase">Automation Queue Empty</h3>
-                <p className="text-sm text-slate-500 font-medium">Schedule your news stories here to build a continuous content pulse.</p>
-                <button onClick={() => setActiveTab('dashboard')} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">Start Crafting</button>
-             </div>
-           </div>
-        </div>
-      )}
-
       {activeTab === 'settings' && (
-        <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-8">
-           <div className="bg-white p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-slate-100 shadow-sm space-y-8">
-              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Enterprise Gateway</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                   <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">WordPress REST API</label><input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-red-500" value={settings.wordpressUrl} onChange={(e) => setSettings({ ...settings, wordpressUrl: e.target.value })} /></div>
-                   <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Brand Handle</label><input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-red-500" value={settings.brandWebsite} onChange={(e) => setSettings({ ...settings, brandWebsite: e.target.value })} /></div>
+        <div className="max-w-5xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-8 pb-32">
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Branding Engine */}
+              <div className="bg-white p-8 lg:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-brand/10 text-brand flex items-center justify-center"><Palette size={24} /></div>
+                  <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Brand Theme Engine</h2>
                 </div>
-                <div className="space-y-4">
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Global Branding Logo</label>
-                    <div className="flex items-center gap-4">
-                       <button onClick={() => logoInputRef.current?.click()} className="w-20 h-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:border-red-500 hover:text-red-500 transition-all group overflow-hidden">{settings.logoUrl ? <img src={settings.logoUrl} className="w-full h-full object-contain p-2" /> : <Upload size={20} />}<span className="text-[8px] font-black mt-1 uppercase">{settings.logoUrl ? 'Change' : 'Upload'}</span></button>
+                
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Brand Color</span>
+                      <span className="text-xs font-bold text-slate-900">App and Asset Accents</span>
                     </div>
-                    <input type="file" ref={logoInputRef} className="hidden" accept="image/png" onChange={handleLogoUpload} />
+                    <input 
+                      type="color" 
+                      className="w-14 h-10 bg-transparent cursor-pointer rounded-lg overflow-hidden border-none"
+                      value={settings.branding.primaryColor}
+                      onChange={(e) => setSettings({ ...settings, branding: { ...settings.branding, primaryColor: e.target.value }})}
+                    />
                   </div>
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Broadcast Template</label>
-                    <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-xs uppercase" value={settings.selectedTemplate} onChange={(e) => setSettings({ ...settings, selectedTemplate: e.target.value as TemplateType })}>{Object.values(TemplateType).map(t => <option key={t} value={t}>{t}</option>)}</select>
+
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Power Highlight Color</span>
+                      <span className="text-xs font-bold text-slate-900">Graphic Power-Words</span>
+                    </div>
+                    <input 
+                      type="color" 
+                      className="w-14 h-10 bg-transparent cursor-pointer rounded-lg overflow-hidden border-none"
+                      value={settings.branding.accentColor}
+                      onChange={(e) => setSettings({ ...settings, branding: { ...settings.branding, accentColor: e.target.value }})}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between px-2">
+                    <span className="text-xs font-bold text-slate-700">Apply Custom Branding to Content</span>
+                    <button 
+                      onClick={() => setSettings({...settings, branding: {...settings.branding, useCustomColors: !settings.branding.useCustomColors}})}
+                      className={`w-12 h-6 rounded-full transition-colors relative ${settings.branding.useCustomColors ? 'bg-brand' : 'bg-slate-200'}`}
+                    >
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.branding.useCustomColors ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
                   </div>
                 </div>
               </div>
+
+              {/* AI Logic Studio */}
+              <div className="bg-white p-8 lg:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center"><BrainCircuit size={24} /></div>
+                  <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">AI Logic Studio</h2>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Brand Voice Persona</label>
+                    <textarea 
+                      className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xs outline-none focus:border-brand h-24 resize-none"
+                      placeholder="e.g. Authoritative, Professional Newsroom..."
+                      value={settings.aiConfig.brandVoice}
+                      onChange={(e) => setSettings({...settings, aiConfig: {...settings.aiConfig, brandVoice: e.target.value}})}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center px-1">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Creativity (Temp)</label>
+                       <span className="text-[10px] font-black text-slate-900">{settings.aiConfig.creativity}</span>
+                    </div>
+                    <input 
+                      type="range" min="0" max="1" step="0.1" 
+                      className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-brand"
+                      value={settings.aiConfig.creativity}
+                      onChange={(e) => setSettings({...settings, aiConfig: {...settings.aiConfig, creativity: parseFloat(e.target.value)}})}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-xs font-bold text-slate-700">Use Search Grounding (Live Facts)</span>
+                    <button 
+                      onClick={() => setSettings({...settings, aiConfig: {...settings.aiConfig, useGrounding: !settings.aiConfig.useGrounding}})}
+                      className={`w-12 h-6 rounded-full transition-colors relative ${settings.aiConfig.useGrounding ? 'bg-emerald-500' : 'bg-slate-200'}`}
+                    >
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.aiConfig.useGrounding ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Automation Node */}
+              <div className="bg-white p-8 lg:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Cpu size={24} /></div>
+                  <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Automation Node</h2>
+                </div>
+
+                <div className="space-y-6">
+                   <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daily Dispatch Limit</span>
+                      <span className="text-xs font-bold text-slate-900">Ingestion throttle</span>
+                    </div>
+                    <input 
+                      type="number" 
+                      className="w-20 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none focus:border-brand"
+                      value={settings.dailyLimit}
+                      onChange={(e) => setSettings({...settings, dailyLimit: parseInt(e.target.value)})}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex flex-col">
+                       <span className="text-xs font-bold text-slate-700">Autonomous Broadcast Mode</span>
+                       <span className="text-[9px] font-bold text-slate-400 uppercase">System will auto-post trending news</span>
+                    </div>
+                    <button 
+                      onClick={() => setSettings({...settings, autoPublish: !settings.autoPublish})}
+                      className={`w-12 h-6 rounded-full transition-colors relative ${settings.autoPublish ? 'bg-brand' : 'bg-slate-200'}`}
+                    >
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.autoPublish ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* API Integration Gateway */}
+              <div className="bg-white p-8 lg:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-600 flex items-center justify-center"><Settings2 size={24} /></div>
+                  <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Gateway Config</h2>
+                </div>
+
+                <div className="space-y-4">
+                   <div className="space-y-1.5">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">WordPress Cluster Endpoint</label>
+                     <input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-brand" value={settings.wordpressUrl} onChange={(e) => setSettings({ ...settings, wordpressUrl: e.target.value })} />
+                   </div>
+                   <div className="space-y-1.5">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Brand Dispatch ID</label>
+                     <input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-brand" value={settings.brandWebsite} onChange={(e) => setSettings({ ...settings, brandWebsite: e.target.value })} />
+                   </div>
+                </div>
+              </div>
            </div>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[Platform.FACEBOOK, Platform.INSTAGRAM, Platform.TWITTER, Platform.LINKEDIN].map(p => (
                 <ConnectionCard 
                   key={p} 
                   platform={p} 
                   connection={settings[getSettingsKey(p)]} 
-                  onConnect={() => handleConnectAccount(p)} 
+                  onConnect={() => initiateSocialConnection(p)} 
                   onDisconnect={() => handleDisconnectAccount(p)} 
                   onManualConnect={(conn) => handleManualConnectionUpdate(p, conn)}
                 />
@@ -570,50 +649,13 @@ const App: React.FC = () => {
                   <h2 className="text-3xl font-black text-slate-900 tracking-tight">{user.name}</h2>
                   <p className="text-slate-500 font-bold mb-4">{user.email}</p>
                   <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                    <span className="px-4 py-1.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-200">{user.plan} Account</span>
-                    <span className="px-4 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest">Active Member</span>
+                    <span className="px-4 py-1.5 bg-brand text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-brand">{user.plan} Account</span>
+                    <span className="px-4 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest">Active Node</span>
                   </div>
                 </div>
-                <button onClick={() => window.location.reload()} className="p-4 bg-slate-50 text-slate-400 hover:text-red-600 rounded-2xl transition-all border border-slate-100">
+                <button onClick={() => window.location.reload()} className="p-4 bg-slate-50 text-slate-400 hover:text-brand rounded-2xl transition-all border border-slate-100">
                   <LogOut size={24} />
                 </button>
-              </div>
-           </div>
-
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-emerald-500" /> Security & Privacy
-                </h3>
-                <div className="space-y-4">
-                   <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                     <div className="flex items-center gap-3">
-                        <Lock size={18} className="text-slate-400" />
-                        <span className="text-sm font-bold text-slate-700">Two-Factor Auth</span>
-                     </div>
-                     <div className="w-12 h-6 bg-emerald-500 rounded-full flex items-center px-1"><div className="w-4 h-4 bg-white rounded-full translate-x-6"></div></div>
-                   </div>
-                   <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                     <div className="flex items-center gap-3">
-                        <Mail size={18} className="text-slate-400" />
-                        <span className="text-sm font-bold text-slate-700">Email Alerts</span>
-                     </div>
-                     <div className="w-12 h-6 bg-slate-200 rounded-full flex items-center px-1"><div className="w-4 h-4 bg-white rounded-full"></div></div>
-                   </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <CreditCard size={16} className="text-red-600" /> Billing & Usage
-                </h3>
-                <div className="space-y-4">
-                   <div className="p-4 bg-slate-50 rounded-2xl flex items-center justify-between">
-                      <span className="text-sm font-bold text-slate-700">Next Invoice</span>
-                      <span className="text-xs font-black text-slate-900 uppercase">Oct 12, 2024</span>
-                   </div>
-                   <button className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all">Manage Subscription</button>
-                </div>
               </div>
            </div>
         </div>
@@ -635,15 +677,14 @@ const App: React.FC = () => {
                 <tr><td colSpan={4} className="px-8 py-32 text-center"><History size={48} className="text-slate-100 mx-auto mb-4" /><p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Audit Logs Empty - Start Broadcasting</p></td></tr>
               ) : logs.map(log => (
                 <tr key={log.id} className="hover:bg-slate-50/30 transition-colors">
-                  <td className="px-8 py-6">
-                    <p className="text-[10px] font-black text-slate-900 uppercase">{new Date(log.timestamp).toLocaleDateString()}</p>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase">{new Date(log.timestamp).toLocaleTimeString()}</p>
+                  <td className="px-8 py-6 text-slate-900 font-black text-[10px] uppercase">
+                    {new Date(log.timestamp).toLocaleString()}
                   </td>
                   <td className="px-8 py-6"><p className="text-xs font-bold text-slate-900 truncate max-w-xs">{log.postTitle}</p></td>
                   <td className="px-8 py-6">
                     <div className="flex gap-1.5">
                       {Object.entries(log.platforms).map(([p, status], i) => (
-                        <div key={i} className={`w-6 h-6 rounded-lg flex items-center justify-center text-white ${status === 'success' ? 'bg-emerald-500' : 'bg-red-500'} shadow-sm`} title={p}>
+                        <div key={i} className={`w-6 h-6 rounded-lg flex items-center justify-center text-white ${status === 'success' ? 'bg-emerald-500' : 'bg-brand'} shadow-sm`} title={p}>
                           {status === 'success' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
                         </div>
                       ))}
@@ -652,7 +693,7 @@ const App: React.FC = () => {
                   <td className="px-8 py-6 text-right">
                     <div className="flex items-center gap-2 justify-end">
                       {log.platforms[Platform.TWITTER] === 'success' && <Key size={14} className="text-emerald-500" title="Signed with Enterprise Keys" />}
-                      <button className="p-2.5 text-slate-300 hover:text-red-600 bg-slate-50 rounded-xl transition-all"><ExternalLink size={14} /></button>
+                      <button className="p-2.5 text-slate-300 hover:text-brand bg-slate-50 rounded-xl transition-all"><ExternalLink size={14} /></button>
                     </div>
                   </td>
                 </tr>

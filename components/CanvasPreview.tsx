@@ -35,54 +35,25 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
-    const getProxySrc = (url: string, attempt: number = 0) => {
-      if (!url) return '';
-      if (url.startsWith('data:') || url.startsWith('blob:')) return url;
-      
-      const width = lowDataMode ? 800 : 1200;
-      const encodedUrl = encodeURIComponent(url);
-
-      // Multi-stage proxy strategy
-      switch(attempt) {
-        case 0: return `https://images.weserv.nl/?url=${encodedUrl}&w=${width}&fit=cover&a=attention`;
-        case 1: return `https://wsrv.nl/?url=${encodedUrl}&w=${width}&fit=cover`;
-        case 2: return `https://corsproxy.io/?${encodedUrl}`;
-        default: return url; // Direct fallback
-      }
-    };
-
     const loadImageCached = async (url: string): Promise<HTMLImageElement> => {
       if (!url) throw new Error("URL is missing");
       const cacheKey = `${url}_${lowDataMode ? 'low' : 'high'}`;
       if (imageCache[cacheKey]) return imageCache[cacheKey];
 
-      const tryLoad = (src: string): Promise<HTMLImageElement> => {
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => resolve(img);
-          img.onerror = () => reject();
-          img.src = src;
-        });
-      };
-
-      // Attempt to load through various proxies
-      for (let i = 0; i < 4; i++) {
-        try {
-          const src = getProxySrc(url, i);
-          const loadedImg = await tryLoad(src);
-          imageCache[cacheKey] = loadedImg;
-          return loadedImg;
-        } catch (e) {
-          if (i === 3) throw new Error(`All load attempts failed for ${url}`);
-          continue;
-        }
-      }
-      throw new Error("Failed to load image");
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          imageCache[cacheKey] = img;
+          resolve(img);
+        };
+        img.onerror = () => reject();
+        // Use a proxy to avoid CORS issues for custom logos
+        img.src = url.startsWith('data:') ? url : `https://images.weserv.nl/?url=${encodeURIComponent(url)}&fit=contain`;
+      });
     };
 
     const render = async () => {
-      // Clear canvas for fresh render
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const baseConfig = TEMPLATE_CONFIGS[template] || TEMPLATE_CONFIGS[TemplateType.STANDARD];
@@ -96,7 +67,7 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({
       const visualHeadline = (post.visualHeadline || post.title).toUpperCase();
       const highlights = (post.highlightWords || []).map(w => w.toUpperCase());
 
-      // 1. Draw Background (Wait for it to ensure it's at the bottom layer)
+      // 1. Draw Background
       try {
         const imgUrl = post.aiImageUrl || post.featuredImageUrl;
         const bgImg = await loadImageCached(imgUrl);
@@ -107,21 +78,20 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({
         const y = (canvas.height / 2) - (bgImg.height / 2) * scale;
         ctx.drawImage(bgImg, x, y, bgImg.width * scale, bgImg.height * scale);
       } catch (e) {
-        console.warn("Background load failed, using fallback color", e);
         ctx.fillStyle = config.backgroundColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      // 2. Legibility Overlay
+      // 2. Overlay Gradient
       const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
       if (template === TemplateType.MODERN_NEWS) {
-        gradient.addColorStop(0, 'rgba(0,0,0,0.5)');
+        gradient.addColorStop(0, 'rgba(0,0,0,0.4)');
         gradient.addColorStop(0.3, 'rgba(0,0,0,0)');
-        gradient.addColorStop(0.6, 'rgba(255,255,255,0)');
+        gradient.addColorStop(0.7, 'rgba(255,255,255,0)');
         gradient.addColorStop(1, 'rgba(255,255,255,0.95)');
       } else {
-        gradient.addColorStop(0, 'rgba(0,0,0,0.6)');
-        gradient.addColorStop(1, 'rgba(0,0,0,0.9)');
+        gradient.addColorStop(0, 'rgba(0,0,0,0.5)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0.85)');
       }
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -156,14 +126,6 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({
           lineStr.split(' ').forEach(word => {
             const isHighlighted = highlights.some(h => word.includes(h) || h.includes(word));
             ctx.fillStyle = isHighlighted ? config.accentColor : (template === TemplateType.MODERN_NEWS ? '#111827' : '#FFFFFF');
-            
-            if (template !== TemplateType.MODERN_NEWS) {
-              ctx.shadowColor = 'rgba(0,0,0,0.7)';
-              ctx.shadowBlur = 10;
-            } else {
-              ctx.shadowBlur = 0;
-            }
-
             ctx.textAlign = 'left';
             ctx.fillText(word + ' ', curX, curY);
             curX += ctx.measureText(word + ' ').width;
@@ -173,53 +135,63 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({
         return curY;
       };
 
-      // 3. Template Rendering
+      // 3. Render Template Specifics
       if (template === TemplateType.MODERN_NEWS) {
-        const margin = 60;
-        const boxWidth = canvas.width - (margin * 2);
-        const boxY = canvas.height - 420;
-        
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, canvas.height - 110, canvas.width, 110);
-        
-        wrapText(visualHeadline, canvas.width / 2, boxY, boxWidth, 64, 'center');
-        
+        wrapText(visualHeadline, canvas.width / 2, canvas.height - 400, canvas.width - 120, 64, 'center');
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '900 34px Inter';
         ctx.textAlign = 'center';
         ctx.fillText(handleText, canvas.width / 2, canvas.height - 45);
-
       } else if (template === TemplateType.BREAKING_NEWS) {
         ctx.fillStyle = config.barColor;
-        ctx.fillRect(0, canvas.height - 320, canvas.width, 320);
-        
+        ctx.fillRect(0, canvas.height - 300, canvas.width, 300);
         ctx.fillStyle = config.accentColor;
-        ctx.font = '900 44px Inter';
-        ctx.textAlign = 'left';
-        ctx.fillText('BREAKING NEWS BROADCAST', 70, canvas.height - 240);
-        
+        ctx.font = '900 40px Inter';
+        ctx.fillText('LIVE BROADCAST', 70, canvas.height - 230);
         wrapText(visualHeadline, 70, canvas.height - 160, canvas.width - 140, 60, 'left');
       } else {
         ctx.fillStyle = config.barColor;
         ctx.fillRect(0, canvas.height - 150, canvas.width, 150);
         wrapText(visualHeadline, 70, canvas.height - 320, canvas.width - 140, 68, 'left');
-        
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '900 30px Inter';
         ctx.textAlign = 'right';
         ctx.fillText(handleText, canvas.width - 70, canvas.height - 65);
       }
 
-      // 4. Logo Render
+      // 4. Enhanced Logo Rendering (Transparency Support)
       try {
-        const logoToUse = (logoUrl && logoUrl.trim() !== "") ? logoUrl : (baseConfig.defaultLogo || APP_LOGO_BASE64);
+        const logoToUse = (logoUrl && logoUrl.trim() !== "") ? logoUrl : APP_LOGO_BASE64;
         const logoImg = await loadImageCached(logoToUse);
         if (isCancelled) return;
+        
+        ctx.save();
+        
+        // Mechanism for Visibility: Add a subtle glow/shadow for transparent logos
+        // This ensures a dark transparent logo is visible on a dark background
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 4;
+
+        // Apply template filters (e.g. Invert for Minimalist)
+        if (config.logoFilter && config.logoFilter !== 'none') {
+            ctx.filter = config.logoFilter;
+        }
+
         const h = 110;
         const w = (logoImg.width / logoImg.height) * h;
-        ctx.drawImage(logoImg, 70, 70, Math.min(w, 450), h);
+        const maxW = 450;
+        const finalW = Math.min(w, maxW);
+        
+        // Center vertically in the top padding
+        ctx.drawImage(logoImg, 70, 70, finalW, h);
+        
+        ctx.restore();
       } catch (e) {
-        console.warn("Logo load failed", e);
+        console.warn("Logo skipped", e);
       }
 
       if (onExport && !isCancelled) onExport(canvas.toDataURL('image/png', 0.95));
@@ -227,10 +199,10 @@ const CanvasPreview: React.FC<CanvasPreviewProps> = ({
 
     render();
     return () => { isCancelled = true; };
-  }, [post.id, post.aiImageUrl, post.featuredImageUrl, post.visualHeadline, template, logoUrl, brandWebsite, onExport]);
+  }, [post.id, post.aiImageUrl, post.featuredImageUrl, post.visualHeadline, template, logoUrl, brandWebsite, onExport, branding]);
 
   return (
-    <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-slate-100 border-4 border-white aspect-square w-full">
+    <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-slate-100 border-4 border-white aspect-square w-full group">
       <canvas ref={canvasRef} width={1080} height={1080} className="w-full h-full object-contain" />
     </div>
   );
