@@ -55,7 +55,9 @@ import {
   Palette,
   BrainCircuit,
   Settings2,
-  Cpu
+  Cpu,
+  Trash2,
+  Image as ImageIcon
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -96,7 +98,6 @@ const App: React.FC = () => {
 
   // --- THEME ENGINE ---
   useEffect(() => {
-    // Inject dynamic styles based on settings
     const root = document.documentElement;
     const primary = settings.branding.primaryColor;
     root.style.setProperty('--brand-primary', primary);
@@ -200,15 +201,34 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * PRO CUSTOM LOGO UPLOAD FUNCTION
+   * Supports standard formats (PNG, JPG, SVG, WEBP)
+   */
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type === 'image/png') {
+    if (file) {
+      const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        alert("Unsupported file format. Please use PNG, JPG, SVG, or WEBP.");
+        return;
+      }
+      
       const reader = new FileReader();
       reader.onload = (event) => {
         setSettings(prev => ({ ...prev, logoUrl: event.target?.result as string }));
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  /**
+   * REMOVE CUSTOM LOGO FUNCTION
+   * Reverts branding to default system assets
+   */
+  const handleRemoveLogo = () => {
+    setSettings(prev => ({ ...prev, logoUrl: '' }));
+    if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
   const getSettingsKey = (platform: Platform): keyof AppSettings => {
@@ -487,6 +507,58 @@ const App: React.FC = () => {
                 </div>
                 
                 <div className="space-y-6">
+                  {/* Custom Logo Upload Logic UI */}
+                  <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-200 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Brand Logo</span>
+                        <span className="text-xs font-bold text-slate-900">Custom SVG or PNG</span>
+                      </div>
+                      {settings.logoUrl && (
+                        <button 
+                          onClick={handleRemoveLogo}
+                          className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                          title="Remove custom logo"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                      <div className="w-24 h-24 bg-white border-2 border-slate-100 rounded-[1.5rem] shadow-sm flex items-center justify-center overflow-hidden p-3 relative group">
+                        {settings.logoUrl ? (
+                          <img src={settings.logoUrl} className="max-w-full max-h-full object-contain" alt="Custom Brand Logo" />
+                        ) : (
+                          <ImageIcon size={32} className="text-slate-200" />
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                           <button onClick={() => logoInputRef.current?.click()} className="p-2 bg-white rounded-full text-slate-900 shadow-xl">
+                              <Upload size={16} />
+                           </button>
+                        </div>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <p className="text-[10px] font-medium text-slate-500 leading-relaxed">
+                          Recommended: Transparent SVG or PNG (Minimum 500px width). This logo will be integrated across all broadcast graphics.
+                        </p>
+                        <button 
+                          onClick={() => logoInputRef.current?.click()}
+                          className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-brand hover:text-brand transition-all flex items-center gap-2"
+                        >
+                          <Upload size={14} /> {settings.logoUrl ? 'Update Logo' : 'Choose File'}
+                        </button>
+                        <input 
+                          type="file" 
+                          ref={logoInputRef} 
+                          className="hidden" 
+                          accept="image/png, image/jpeg, image/svg+xml, image/webp" 
+                          onChange={handleLogoUpload} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Brand Color</span>
