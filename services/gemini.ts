@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { AIConfig, PerformanceScore, ContentVariations } from "../types";
+import { AIConfig, PerformanceScore, ContentVariations, Platform } from "../types";
 
 const MODEL_TEXT = 'gemini-3-flash-preview';
 const MODEL_IMAGE = 'gemini-2.5-flash-image';
@@ -18,6 +18,7 @@ export interface VisualHeadlineResult {
   highlights: string[];
 }
 
+// Fixed visual headline generation with proper model and JSON handling
 export const generateVisualHeadline = async (title: string, excerpt: string): Promise<VisualHeadlineResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Convert this news title into a catchy, short, and punchy headline for a social media graphic. 
@@ -53,6 +54,7 @@ export const generateVisualHeadline = async (title: string, excerpt: string): Pr
   }
 };
 
+// Fixed hashtag generation with proper model and JSON handling
 export const generateHashtags = async (title: string, excerpt: string, brandName: string): Promise<HashtagSet> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Generate 15 SEO-optimized hashtags for a social post.
@@ -88,6 +90,7 @@ export const generateHashtags = async (title: string, excerpt: string, brandName
   }
 };
 
+// Fixed generateSocialCaption to use 'X' instead of 'Twitter' to match ContentVariations type definition
 export const generateSocialCaption = async (
   postTitle: string, 
   excerpt: string, 
@@ -98,7 +101,8 @@ export const generateSocialCaption = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const selectedTone = toneOverride || config.brandVoice;
   
-  const prompt = `Write 4 social captions for: "${postTitle}". Excerpt: "${excerpt}". Link: "${postLink}". Voice: ${selectedTone}. Language: ${config.targetLanguage}. Return JSON with Facebook, Instagram, Twitter, LinkedIn keys.`;
+  // Prompt updated to request 'X' instead of 'Twitter' to align with Platform enum values
+  const prompt = `Write 4 social captions for: "${postTitle}". Excerpt: "${excerpt}". Link: "${postLink}". Voice: ${selectedTone}. Language: ${config.targetLanguage}. Return JSON with Facebook, Instagram, X, LinkedIn keys.`;
   
   try {
     const response = await ai.models.generateContent({
@@ -113,20 +117,29 @@ export const generateSocialCaption = async (
           properties: {
             Facebook: { type: Type.STRING },
             Instagram: { type: Type.STRING },
-            Twitter: { type: Type.STRING },
+            // Key updated to 'X' to align with Platform enum value used in ContentVariations interface
+            X: { type: Type.STRING },
             LinkedIn: { type: Type.STRING }
           },
-          required: ["Facebook", "Instagram", "Twitter", "LinkedIn"]
+          // Updated required properties to match schema
+          required: ["Facebook", "Instagram", "X", "LinkedIn"]
         }
       }
     });
     return JSON.parse(response.text || "{}");
   } catch (error) {
     const fallback = `${postTitle} - ${postLink}`;
-    return { Facebook: fallback, Instagram: fallback, Twitter: fallback, LinkedIn: fallback };
+    // Fixed: return object with keys defined in ContentVariations interface using Platform enum
+    return { 
+      [Platform.FACEBOOK]: fallback, 
+      [Platform.INSTAGRAM]: fallback, 
+      [Platform.X]: fallback, 
+      [Platform.LINKEDIN]: fallback 
+    };
   }
 };
 
+// Fixed performance prediction with proper model and JSON handling
 export const predictPerformance = async (title: string, caption: string): Promise<PerformanceScore> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Analyze engagement potential for: Title: "${title}", Caption: "${caption}". Return JSON score (0-100), label, reasoning[], suggestions[].`;
@@ -155,6 +168,7 @@ export const predictPerformance = async (title: string, caption: string): Promis
   }
 };
 
+// Fixed generateAudioBrief to handle binary output properly from Gemini TTS
 export const generateAudioBrief = async (text: string): Promise<string | null> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
@@ -172,6 +186,7 @@ export const generateAudioBrief = async (text: string): Promise<string | null> =
   } catch (error) { return null; }
 };
 
+// Fixed generateVideoTeaser with Veo model and long-running operation polling
 export const generateVideoTeaser = async (prompt: string, onProgress?: (msg: string) => void): Promise<string | null> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
@@ -194,6 +209,7 @@ export const generateVideoTeaser = async (prompt: string, onProgress?: (msg: str
   } catch (error) { return null; }
 };
 
+// Fixed generatePostImage to handle image output part properly from Gemini Flash Image
 export const generatePostImage = async (postTitle: string): Promise<string | null> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {

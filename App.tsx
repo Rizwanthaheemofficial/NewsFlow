@@ -21,7 +21,7 @@ import {
   HashtagSet
 } from './services/gemini';
 import { initiateSocialConnection, getStoredConnections, clearConnection, finalizeSocialConnection } from './services/socialAuth';
-import { publishToPlatform, DeploymentEvent } from './services/socialMedia';
+import { publishToPlatform, DeploymentEvent, fetchMetricsForPost } from './services/socialMedia';
 import { 
   Globe, 
   Sparkles, 
@@ -57,7 +57,10 @@ import {
   Settings2,
   Cpu,
   Trash2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ThumbsUp,
+  MessageSquare,
+  BarChart3
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -72,7 +75,7 @@ const App: React.FC = () => {
       ...base,
       fbConnection: connections[Platform.FACEBOOK] || base.fbConnection,
       igConnection: connections[Platform.INSTAGRAM] || base.igConnection,
-      xConnection: connections[Platform.TWITTER] || base.xConnection,
+      xConnection: connections[Platform.X] || base.xConnection,
       liConnection: connections[Platform.LINKEDIN] || base.liConnection,
     };
   });
@@ -88,9 +91,11 @@ const App: React.FC = () => {
   const [exportedImageUrl, setExportedImageUrl] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
   const [deploymentEvents, setDeploymentEvents] = useState<DeploymentEvent[]>([]);
   const [isDeploying, setIsDeploying] = useState(false);
   const [globalPulse, setGlobalPulse] = useState<{ id: string, msg: string, platform: Platform }[]>([]);
+  const [syncingLogId, setSyncingLogId] = useState<string | null>(null);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -119,22 +124,34 @@ const App: React.FC = () => {
 
     if (code && state) {
       setGenerating('Finalizing Social Link...');
-      finalizeSocialConnection(code, state).then(conn => {
-        if (conn) {
-          const connections = getStoredConnections();
-          setSettings(prev => ({
-            ...prev,
-            fbConnection: connections[Platform.FACEBOOK] || prev.fbConnection,
-            igConnection: connections[Platform.INSTAGRAM] || prev.igConnection,
-            xConnection: connections[Platform.TWITTER] || prev.xConnection,
-            liConnection: connections[Platform.LINKEDIN] || prev.liConnection,
-          }));
-          setShareFeedback('Account Linked Successfully!');
+      finalizeSocialConnection(code, state)
+        .then(conn => {
+          if (conn) {
+            const connections = getStoredConnections();
+            setSettings(prev => ({
+              ...prev,
+              fbConnection: connections[Platform.FACEBOOK] || prev.fbConnection,
+              igConnection: connections[Platform.INSTAGRAM] || prev.igConnection,
+              xConnection: connections[Platform.X] || prev.xConnection,
+              liConnection: connections[Platform.LINKEDIN] || prev.liConnection,
+            }));
+            setShareFeedback('Account Linked Successfully!');
+            setActiveTab('settings');
+          }
+        })
+        .catch(err => {
+          console.error("OAuth Connection Error:", err);
+          setErrorFeedback(err.message || "OAuth Handshake Failed");
           setActiveTab('settings');
-        }
-        setGenerating(null);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      });
+        })
+        .finally(() => {
+          setGenerating(null);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setTimeout(() => {
+            setShareFeedback(null);
+            setErrorFeedback(null);
+          }, 5000);
+        });
     }
   }, []);
 
@@ -151,7 +168,7 @@ const App: React.FC = () => {
   }, [deploymentEvents]);
 
   useEffect(() => {
-    const platforms = [Platform.FACEBOOK, Platform.INSTAGRAM, Platform.TWITTER, Platform.LINKEDIN];
+    const platforms = [Platform.FACEBOOK, Platform.INSTAGRAM, Platform.X, Platform.LINKEDIN];
     const newsrooms = ["CNN_Central", "BBC_World", "TechCrunch_Live", "Reuters_API", "Bloomberg_Node"];
     
     const interval = setInterval(() => {
@@ -174,7 +191,7 @@ const App: React.FC = () => {
     activePlatforms: [settings.fbConnection, settings.igConnection, settings.xConnection, settings.liConnection].filter(c => c.isConnected).length,
     tokensUsed: 42050 + (logs.length * 1500),
     estimatedSavings: 1250 + (logs.length * 45),
-    totalEngagement: 85400 + (logs.length * 320)
+    totalEngagement: 85400 + logs.reduce((acc, log) => acc + (log.metrics?.reach || 0), 0)
   };
 
   // --- HANDLERS ---
@@ -201,10 +218,6 @@ const App: React.FC = () => {
     }
   };
 
-  /**
-   * PRO CUSTOM LOGO UPLOAD FUNCTION
-   * Supports standard formats (PNG, JPG, SVG, WEBP)
-   */
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -222,10 +235,6 @@ const App: React.FC = () => {
     }
   };
 
-  /**
-   * REMOVE CUSTOM LOGO FUNCTION
-   * Reverts branding to default system assets
-   */
   const handleRemoveLogo = () => {
     setSettings(prev => ({ ...prev, logoUrl: '' }));
     if (logoInputRef.current) logoInputRef.current.value = '';
@@ -235,7 +244,7 @@ const App: React.FC = () => {
     switch(platform) {
       case Platform.FACEBOOK: return 'fbConnection';
       case Platform.INSTAGRAM: return 'igConnection';
-      case Platform.TWITTER: return 'xConnection';
+      case Platform.X: return 'xConnection';
       case Platform.LINKEDIN: return 'liConnection';
       default: throw new Error('Invalid platform');
     }
@@ -282,7 +291,7 @@ const App: React.FC = () => {
       const enriched: ContentVariations = {
         [Platform.FACEBOOK]: `${newCaptions[Platform.FACEBOOK]}\n\n${hashtagString}`,
         [Platform.INSTAGRAM]: `${newCaptions[Platform.INSTAGRAM]}\n\n${hashtagString}`,
-        [Platform.TWITTER]: `${newCaptions[Platform.TWITTER]}\n\n${hashtagString}`,
+        [Platform.X]: `${newCaptions[Platform.X]}\n\n${hashtagString}`,
         [Platform.LINKEDIN]: `${newCaptions[Platform.LINKEDIN]}\n\n${hashtagString}`,
       };
 
@@ -295,10 +304,54 @@ const App: React.FC = () => {
     }
   };
 
+  const handleNativeShare = async () => {
+    if (!selectedPost || !captions) {
+      setShareFeedback("Generate content first!");
+      setTimeout(() => setShareFeedback(null), 3000);
+      return;
+    }
+    
+    const shareText = captions[Platform.X];
+    const shareUrl = selectedPost.link;
+
+    try {
+      let filesToShare: File[] = [];
+      if (exportedImageUrl) {
+        const response = await fetch(exportedImageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'news-broadcast.png', { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          filesToShare = [file];
+        }
+      }
+
+      if (navigator.share) {
+        await navigator.share({
+          title: selectedPost.title,
+          text: shareText,
+          url: shareUrl,
+          files: filesToShare.length > 0 ? filesToShare : undefined
+        });
+        setShareFeedback("Shared!");
+      } else {
+        throw new Error('Web Share API not available');
+      }
+    } catch (error) {
+      // Fallback to clipboard
+      await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+      setIsCopied(true);
+      setShareFeedback("Copied to clipboard");
+      setTimeout(() => {
+        setIsCopied(false);
+        setShareFeedback(null);
+      }, 3000);
+    }
+  };
+
   const handleBroadcast = async () => {
     if (!selectedPost || !captions) return;
     
-    const activeCons = [Platform.FACEBOOK, Platform.INSTAGRAM, Platform.TWITTER, Platform.LINKEDIN].filter(p => settings[getSettingsKey(p)].isConnected);
+    const activeCons = [Platform.FACEBOOK, Platform.INSTAGRAM, Platform.X, Platform.LINKEDIN].filter(p => settings[getSettingsKey(p)].isConnected);
     
     if (activeCons.length === 0) {
       alert("No social accounts connected. Link your accounts in Settings first.");
@@ -313,9 +366,10 @@ const App: React.FC = () => {
       id: `log_${Date.now()}`,
       timestamp: new Date().toISOString(),
       postTitle: selectedPost.title,
-      caption: captions[Platform.FACEBOOK],
+      caption: captions[Platform.X] || captions[Platform.FACEBOOK],
       imageUrl: exportedImageUrl || selectedPost.aiImageUrl || selectedPost.featuredImageUrl,
-      platforms: {}
+      platforms: {},
+      metrics: { likes: 0, shares: 0, comments: 0, reach: 0 }
     };
 
     for (const platform of activeCons) {
@@ -340,6 +394,20 @@ const App: React.FC = () => {
     }, 4000);
   };
 
+  const handleSyncMetrics = async (logId: string) => {
+    setSyncingLogId(logId);
+    try {
+      const metrics = await fetchMetricsForPost(logId);
+      setLogs(prev => prev.map(log => 
+        log.id === logId ? { ...log, metrics } : log
+      ));
+    } catch (error) {
+      console.error("Metrics sync failed", error);
+    } finally {
+      setSyncingLogId(null);
+    }
+  };
+
   if (!user) return <Login onLogin={setUser} />;
 
   return (
@@ -354,6 +422,14 @@ const App: React.FC = () => {
         .ring-brand { --tw-ring-color: var(--brand-primary); }
         .shadow-brand { box-shadow: 0 10px 15px -3px rgba(var(--brand-primary-rgb), 0.3); }
       `}</style>
+
+      {/* Global Toast for Errors/Success */}
+      {(shareFeedback || errorFeedback) && (
+        <div className={`fixed bottom-10 right-10 z-[110] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-300 ${errorFeedback ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
+           {errorFeedback ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+           <span className="text-xs font-black uppercase tracking-widest">{errorFeedback || shareFeedback}</span>
+        </div>
+      )}
 
       {/* Deployment Modal Terminal */}
       {isDeploying && (
@@ -425,7 +501,7 @@ const App: React.FC = () => {
                   {loading ? (
                     <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-300">
                       <Loader2 className="animate-spin" size={24} />
-                      <p className="text-[10px] font-black uppercase tracking-widest">Injesting News...</p>
+                      <p className="text-[10px] font-black uppercase widest">Injesting News...</p>
                     </div>
                   ) : posts.map(post => (
                     <button key={post.id} onClick={() => handlePostSelection(post)} className={`w-full text-left p-3 rounded-2xl transition-all border-2 flex gap-4 ${selectedPost?.id === post.id ? 'border-brand bg-brand/5' : 'border-transparent hover:bg-slate-50'}`}>
@@ -452,6 +528,17 @@ const App: React.FC = () => {
                   <div className="space-y-6">
                     <div className="bg-white p-4 rounded-[2.5rem] lg:rounded-[3rem] shadow-2xl border border-slate-100 relative group">
                        <CanvasPreview post={selectedPost} template={settings.selectedTemplate} brandWebsite={settings.brandWebsite} logoUrl={settings.logoUrl} branding={settings.branding} onExport={setExportedImageUrl} />
+                       
+                       {/* Floating Share Quick Action */}
+                       <div className="absolute top-8 right-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={handleNativeShare} 
+                            className="p-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl text-slate-900 hover:text-brand transition-all flex items-center gap-2"
+                            title="Quick Share"
+                          >
+                             <Share2 size={20} />
+                          </button>
+                       </div>
                     </div>
 
                     <div className="bg-slate-950 rounded-[2rem] p-6 text-white grid grid-cols-3 gap-3 border border-slate-800">
@@ -477,10 +564,22 @@ const App: React.FC = () => {
 
                       {captions ? (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                           <textarea className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold leading-relaxed min-h-[160px] outline-none focus:border-brand/30 transition-all resize-none" value={captions[Platform.FACEBOOK]} readOnly />
-                           <button onClick={handleBroadcast} disabled={!!generating || isDeploying} className="w-full py-5 bg-brand text-white rounded-[1.5rem] font-black text-sm shadow-brand flex items-center justify-center gap-3 active:scale-95 transition-all hover:brightness-110 disabled:opacity-50">
-                              <Share size={18} /> {isDeploying ? 'Deploying...' : 'Deploy Live Signal'}
-                           </button>
+                           <textarea className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold leading-relaxed min-h-[160px] outline-none focus:border-brand/30 transition-all resize-none" value={captions[Platform.X]} readOnly />
+                           
+                           {shareFeedback && (
+                             <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest text-center animate-in fade-in slide-in-from-top-2">
+                               {shareFeedback}
+                             </div>
+                           )}
+
+                           <div className="grid grid-cols-2 gap-3">
+                             <button onClick={handleNativeShare} className="py-5 bg-slate-100 text-slate-900 rounded-[1.5rem] font-black text-sm flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-slate-200">
+                                <Share2 size={18} /> {isCopied ? 'Copied' : 'Native Share'}
+                             </button>
+                             <button onClick={handleBroadcast} disabled={!!generating || isDeploying} className="py-5 bg-brand text-white rounded-[1.5rem] font-black text-sm shadow-brand flex items-center justify-center gap-3 active:scale-95 transition-all hover:brightness-110 disabled:opacity-50">
+                                <Share size={18} /> {isDeploying ? 'Deploying...' : 'Deploy API'}
+                             </button>
+                           </div>
                         </div>
                       ) : (
                         <div className="py-20 flex flex-col items-center justify-center text-slate-100 gap-4">
@@ -697,7 +796,7 @@ const App: React.FC = () => {
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[Platform.FACEBOOK, Platform.INSTAGRAM, Platform.TWITTER, Platform.LINKEDIN].map(p => (
+              {[Platform.FACEBOOK, Platform.INSTAGRAM, Platform.X, Platform.LINKEDIN].map(p => (
                 <ConnectionCard 
                   key={p} 
                   platform={p} 
@@ -734,44 +833,152 @@ const App: React.FC = () => {
       )}
 
       {activeTab === 'history' && (
-        <div className="bg-white rounded-[2rem] lg:rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-8">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Broadcast Timestamp</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Story Title</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Deployment Reach</th>
-                <th className="px-8 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Gateway</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {logs.length === 0 ? (
-                <tr><td colSpan={4} className="px-8 py-32 text-center"><History size={48} className="text-slate-100 mx-auto mb-4" /><p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Audit Logs Empty - Start Broadcasting</p></td></tr>
-              ) : logs.map(log => (
-                <tr key={log.id} className="hover:bg-slate-50/30 transition-colors">
-                  <td className="px-8 py-6 text-slate-900 font-black text-[10px] uppercase">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </td>
-                  <td className="px-8 py-6"><p className="text-xs font-bold text-slate-900 truncate max-w-xs">{log.postTitle}</p></td>
-                  <td className="px-8 py-6">
-                    <div className="flex gap-1.5">
-                      {Object.entries(log.platforms).map(([p, status], i) => (
-                        <div key={i} className={`w-6 h-6 rounded-lg flex items-center justify-center text-white ${status === 'success' ? 'bg-emerald-500' : 'bg-brand'} shadow-sm`} title={p}>
-                          {status === 'success' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+        <div className="space-y-6 lg:space-y-10 animate-in fade-in slide-in-from-bottom-8">
+          <div className="flex items-center justify-between px-4">
+            <div className="flex flex-col">
+              <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Broadcast History</h2>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Compliance and Performance Audit</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="px-4 py-2 bg-white rounded-xl border border-slate-100 shadow-sm flex items-center gap-2">
+                 <BarChart3 size={16} className="text-brand" />
+                 <span className="text-xs font-black text-slate-900 uppercase tracking-tight">Real-time Metrics Active</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[2rem] lg:rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse min-w-[1000px]">
+                <thead className="bg-slate-50/50 border-b border-slate-100">
+                  <tr>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Story & Nodes</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Engagement</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Est. Reach</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                    <th className="px-8 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {logs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-8 py-32 text-center text-slate-300">
+                        <History size={64} className="opacity-10 mx-auto mb-6" />
+                        <p className="text-sm font-black uppercase tracking-widest">No Broadcast Data Captured</p>
+                        <button onClick={() => setActiveTab('dashboard')} className="mt-4 text-brand font-bold text-xs hover:underline uppercase tracking-tight">Go to Studio</button>
+                      </td>
+                    </tr>
+                  ) : logs.map(log => (
+                    <tr key={log.id} className="hover:bg-slate-50/30 transition-all group">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-100 shrink-0 shadow-sm">
+                            <img src={log.imageUrl} className="w-full h-full object-cover" alt="" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-slate-900 truncate max-w-[240px] mb-1">{log.postTitle}</p>
+                            <div className="flex items-center gap-3">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{new Date(log.timestamp).toLocaleString()}</span>
+                              <div className="flex -space-x-1.5">
+                                {Object.keys(log.platforms).map(p => (
+                                  <div key={p} className="w-4 h-4 rounded-full bg-slate-100 border border-white flex items-center justify-center ring-2 ring-white">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${log.platforms[p as Platform] === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    <div className="flex items-center gap-2 justify-end">
-                      {log.platforms[Platform.TWITTER] === 'success' && <Key size={14} className="text-emerald-500" title="Signed with Enterprise Keys" />}
-                      <button className="p-2.5 text-slate-300 hover:text-brand bg-slate-50 rounded-xl transition-all"><ExternalLink size={14} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center justify-center gap-8">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1.5 text-slate-600">
+                              <ThumbsUp size={12} className="text-indigo-500" />
+                              <span className="text-xs font-black">{log.metrics?.likes?.toLocaleString() || 0}</span>
+                            </div>
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Likes</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1.5 text-slate-600">
+                              <MessageSquare size={12} className="text-emerald-500" />
+                              <span className="text-xs font-black">{log.metrics?.comments?.toLocaleString() || 0}</span>
+                            </div>
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Replies</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1.5 text-slate-600">
+                              <Share2 size={12} className="text-brand" />
+                              <span className="text-xs font-black">{log.metrics?.shares?.toLocaleString() || 0}</span>
+                            </div>
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Shares</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        <div className="inline-flex flex-col items-center gap-1.5">
+                          <span className="text-sm font-black text-slate-900">{(log.metrics?.reach || 0).toLocaleString()}</span>
+                          <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-brand rounded-full" style={{ width: `${Math.min(100, ((log.metrics?.reach || 0) / 10000) * 100)}%` }}></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        <div className="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
+                          Active
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                           <button 
+                             onClick={() => handleSyncMetrics(log.id)}
+                             disabled={syncingLogId === log.id}
+                             className="p-2.5 text-slate-400 hover:text-brand bg-slate-50 hover:bg-brand/5 rounded-xl transition-all disabled:opacity-50"
+                             title="Sync Metrics"
+                           >
+                             {syncingLogId === log.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                           </button>
+                           <button className="p-2.5 text-slate-400 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all">
+                             <ExternalLink size={14} />
+                           </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <div className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 flex items-center justify-between">
+                <div>
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Network Integrity</p>
+                   <p className="text-xl font-black text-white">99.98%</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                   <ShieldCheck size={20} />
+                </div>
+             </div>
+             <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                <div>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Average Response</p>
+                   <p className="text-xl font-black text-slate-900">42ms</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
+                   <Zap size={20} />
+                </div>
+             </div>
+             <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                <div>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Data Throughput</p>
+                   <p className="text-xl font-black text-slate-900">1.2 GB/d</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                   <BarChart3 size={20} />
+                </div>
+             </div>
+          </div>
         </div>
       )}
     </Layout>

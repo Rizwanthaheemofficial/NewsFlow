@@ -14,7 +14,9 @@ import {
   ChevronDown,
   ShieldCheck,
   AlertCircle,
-  Zap
+  Zap,
+  Info,
+  ShieldAlert
 } from 'lucide-react';
 import { Platform, AccountConnection } from '../types';
 import { verifyManualToken } from '../services/socialAuth';
@@ -39,49 +41,55 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
   const [manualToken, setManualToken] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
-  const [manualError, setManualError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const icons = {
     [Platform.FACEBOOK]: <Facebook size={24} />,
     [Platform.INSTAGRAM]: <Instagram size={24} />,
-    [Platform.TWITTER]: <Twitter size={24} />,
+    [Platform.X]: <Twitter size={24} />, // Twitter icon for X
     [Platform.LINKEDIN]: <Linkedin size={24} />,
   };
 
   const colors = {
     [Platform.FACEBOOK]: 'bg-[#1877F2]',
     [Platform.INSTAGRAM]: 'bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]',
-    [Platform.TWITTER]: 'bg-[#000000]',
+    [Platform.X]: 'bg-[#000000]',
     [Platform.LINKEDIN]: 'bg-[#0077B5]',
   };
 
   const handleConnect = async () => {
     setIsConnecting(true);
+    setError(null);
     try {
       await onConnect();
     } catch (e) {
-      console.error(e);
+      setError(e instanceof Error ? e.message : 'An unexpected error occurred during OAuth handshake.');
     } finally {
       setIsConnecting(false);
     }
   };
 
-  const fillDefaultXKeys = () => {
-    setClientId('RElQcy04RnduZUlWQVdadTVKLWs6MTpjaQ');
-    setClientSecret('6J16Bv9WxCReKQ3sVhCz4I2irNX-boQ5hv_TAMDteVf8GUm7KV');
+  const fillDefaultKeys = () => {
+    if (platform === Platform.X) {
+      setClientId('RElQcy04RnduZUlWQVdadTVKLWs6MTpjaQ');
+      setClientSecret('6J16Bv9WxCReKQ3sVhCz4I2irNX-boQ5hv_TAMDteVf8GUm7KV');
+    } else if (platform === Platform.FACEBOOK || platform === Platform.INSTAGRAM) {
+      setClientId('782910394857261');
+      setClientSecret('8f2a7b9c1d4e5f6a0b1c2d3e4f5a6b7c');
+    }
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     setIsConnecting(true);
-    setManualError(null);
+    setError(null);
     try {
       const conn = await verifyManualToken(
         platform, 
         manualToken, 
-        platform === Platform.TWITTER ? clientId : undefined, 
-        platform === Platform.TWITTER ? clientSecret : undefined
+        clientId, 
+        clientSecret
       );
       onManualConnect(conn);
       setManualToken('');
@@ -89,14 +97,16 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
       setClientSecret('');
       setShowAdvanced(false);
     } catch (err) {
-      setManualError(err instanceof Error ? err.message : 'Validation failed');
+      setError(err instanceof Error ? err.message : 'Validation failed');
     } finally {
       setIsConnecting(false);
     }
   };
 
+  const needsAppCredentials = [Platform.X, Platform.FACEBOOK, Platform.INSTAGRAM].includes(platform);
+
   return (
-    <div className={`relative overflow-hidden bg-white p-6 lg:p-8 rounded-[2.5rem] border-2 transition-all duration-500 ${connection.isConnected ? 'border-emerald-100 shadow-xl shadow-emerald-50/50' : 'border-slate-100 hover:border-slate-200 shadow-sm'}`}>
+    <div className={`relative overflow-hidden bg-white p-6 lg:p-8 rounded-[2.5rem] border-2 transition-all duration-500 ${connection.isConnected ? 'border-emerald-100 shadow-xl shadow-emerald-50/50' : error ? 'border-red-100 shadow-lg shadow-red-50/30' : 'border-slate-100 hover:border-slate-200 shadow-sm'}`}>
       <div className="flex items-start justify-between mb-8">
         <div className={`w-16 h-16 rounded-[1.5rem] ${colors[platform]} flex items-center justify-center text-white shadow-2xl transition-transform hover:rotate-3 shrink-0`}>
           {icons[platform]}
@@ -110,6 +120,11 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
             {connection.clientId && (
               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Enterprise API</span>
             )}
+          </div>
+        ) : error ? (
+          <div className="px-4 py-1.5 bg-red-50 text-red-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-100 flex items-center gap-2 animate-bounce">
+            <ShieldAlert size={10} />
+            Connection Error
           </div>
         ) : (
           <div className="px-4 py-1.5 bg-slate-50 text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-100 flex items-center gap-2">
@@ -126,6 +141,16 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
             : `Authorize NewsFlow to automate broadcasts directly to your ${platform} audience.`}
         </p>
       </div>
+
+      {error && !connection.isConnected && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+          <AlertCircle size={16} className="text-red-500 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="text-[10px] font-black text-red-700 uppercase tracking-wider mb-1">Diagnostic Report</p>
+            <p className="text-[11px] text-red-600 font-bold leading-tight">{error}</p>
+          </div>
+        </div>
+      )}
 
       {connection.isConnected ? (
         <div className="space-y-4 animate-in slide-in-from-bottom-2">
@@ -156,13 +181,13 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           <button 
             onClick={handleConnect}
             disabled={isConnecting}
-            className="w-full py-5 bg-slate-900 text-white font-black text-xs uppercase tracking-[0.15em] rounded-[1.5rem] hover:bg-black transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-3 disabled:opacity-70 group"
+            className={`w-full py-5 text-white font-black text-xs uppercase tracking-[0.15em] rounded-[1.5rem] transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-70 group ${error ? 'bg-red-600 shadow-red-100' : 'bg-slate-900 shadow-slate-200 hover:bg-black'}`}
           >
             {isConnecting && !showAdvanced ? (
               <Loader2 className="animate-spin" size={18} />
             ) : (
               <>
-                Launch Secure OAuth
+                {error ? 'Retry OAuth Handshake' : 'Launch Secure OAuth'}
                 <Globe size={16} className="group-hover:rotate-12 transition-transform" />
               </>
             )}
@@ -173,7 +198,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="w-full flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 py-2 transition-colors"
             >
-              {showAdvanced ? 'Hide Advanced Setup' : platform === Platform.TWITTER ? 'Use Enterprise X Credentials' : 'Use Enterprise API Token'}
+              {showAdvanced ? 'Hide Advanced Setup' : 'Enter Enterprise Credentials'}
               <ChevronDown size={12} className={`transition-transform duration-300 ${showAdvanced ? 'rotate-180' : ''}`} />
             </button>
             
@@ -181,65 +206,58 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               <form onSubmit={handleManualSubmit} className="mt-4 p-5 bg-slate-50 rounded-[1.5rem] border border-slate-200 space-y-4 animate-in slide-in-from-top-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Key size={14} className="text-red-600" />
+                    <Key size={14} className="text-brand" />
                     <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
-                      {platform === Platform.TWITTER ? 'X Developer Portal Keys' : 'Service Account Token'}
+                      Developer Portal Keys
                     </span>
                   </div>
-                  {platform === Platform.TWITTER && (
+                  {needsAppCredentials && (
                     <button 
                       type="button" 
-                      onClick={fillDefaultXKeys}
-                      className="text-[8px] font-black text-red-600 bg-red-50 px-2 py-1 rounded-md uppercase hover:bg-red-100 transition-colors flex items-center gap-1"
+                      onClick={fillDefaultKeys}
+                      className="text-[8px] font-black text-brand bg-brand/5 px-2 py-1 rounded-md uppercase hover:bg-brand/10 transition-colors flex items-center gap-1"
                     >
-                      <Zap size={8} /> Load Provided Keys
+                      <Zap size={8} /> Load Demo Keys
                     </button>
                   )}
                 </div>
                 
                 <div className="space-y-3">
-                  {platform === Platform.TWITTER ? (
+                  {needsAppCredentials && (
                     <>
                       <div className="space-y-1">
-                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Client ID / App Key</label>
+                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">App ID / Client ID</label>
                         <input 
                           type="text" 
-                          placeholder="RElQcy...MTpjaQ"
-                          className={`w-full px-4 py-3 bg-white border ${manualError ? 'border-red-500' : 'border-slate-200'} rounded-xl text-xs font-bold outline-none focus:border-red-500 transition-all`}
+                          placeholder="ID from dev console..."
+                          className={`w-full px-4 py-3 bg-white border ${error ? 'border-red-200' : 'border-slate-200'} rounded-xl text-xs font-bold outline-none focus:border-brand transition-all`}
                           value={clientId}
                           onChange={(e) => setClientId(e.target.value)}
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Client Secret / App Secret</label>
+                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">App Secret / Client Secret</label>
                         <input 
                           type="password" 
-                          placeholder="6J16Bv...GUm7KV"
-                          className={`w-full px-4 py-3 bg-white border ${manualError ? 'border-red-500' : 'border-slate-200'} rounded-xl text-xs font-bold outline-none focus:border-red-500 transition-all`}
+                          placeholder="Secret from dev console..."
+                          className={`w-full px-4 py-3 bg-white border ${error ? 'border-red-200' : 'border-slate-200'} rounded-xl text-xs font-bold outline-none focus:border-brand transition-all`}
                           value={clientSecret}
                           onChange={(e) => setClientSecret(e.target.value)}
                         />
                       </div>
                     </>
-                  ) : (
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Access Token</label>
-                      <input 
-                        type="password" 
-                        placeholder="Enter permanent API token..."
-                        className={`w-full px-4 py-3 bg-white border ${manualError ? 'border-red-500' : 'border-slate-200'} rounded-xl text-xs font-bold outline-none focus:border-red-500 transition-all`}
-                        value={manualToken}
-                        onChange={(e) => setManualToken(e.target.value)}
-                      />
-                    </div>
                   )}
-
-                  {manualError && (
-                    <div className="flex items-center gap-1.5 text-red-600">
-                      <AlertCircle size={10} />
-                      <p className="text-[9px] font-bold uppercase">{manualError}</p>
-                    </div>
-                  )}
+                  
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Long-Lived Access Token</label>
+                    <input 
+                      type="password" 
+                      placeholder="Enter permanent API token..."
+                      className={`w-full px-4 py-3 bg-white border ${error ? 'border-red-200' : 'border-slate-200'} rounded-xl text-xs font-bold outline-none focus:border-brand transition-all`}
+                      value={manualToken}
+                      onChange={(e) => setManualToken(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <button 
@@ -250,7 +268,10 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                   {isConnecting ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={14} />}
                   Handshake & Activate
                 </button>
-                <p className="text-[8px] text-slate-400 leading-tight text-center">Credentials are encrypted at rest. Persistent newsroom deployment mode.</p>
+                <div className="flex items-center gap-2 justify-center">
+                    <Info size={10} className="text-slate-400" />
+                    <p className="text-[8px] text-slate-400 leading-tight uppercase tracking-tight">Encrypted at rest • Enterprise Mode</p>
+                </div>
               </form>
             )}
           </div>

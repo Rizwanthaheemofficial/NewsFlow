@@ -2,7 +2,7 @@
 export enum Platform {
   FACEBOOK = 'Facebook',
   INSTAGRAM = 'Instagram',
-  TWITTER = 'Twitter',
+  X = 'X',
   LINKEDIN = 'LinkedIn'
 }
 
@@ -62,7 +62,7 @@ export interface PerformanceScore {
 export interface ContentVariations {
   [Platform.FACEBOOK]: string;
   [Platform.INSTAGRAM]: string;
-  [Platform.TWITTER]: string;
+  [Platform.X]: string;
   [Platform.LINKEDIN]: string;
 }
 
