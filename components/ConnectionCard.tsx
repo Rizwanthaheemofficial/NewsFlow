@@ -9,6 +9,8 @@ import {
   Twitter, 
   Facebook, 
   Linkedin, 
+  Youtube,
+  Music, // For TikTok fallback if no specific icon
   Loader2, 
   Key, 
   ChevronDown,
@@ -16,7 +18,8 @@ import {
   AlertCircle,
   Zap,
   Info,
-  ShieldAlert
+  ShieldAlert,
+  PlaySquare
 } from 'lucide-react';
 import { Platform, AccountConnection } from '../types';
 import { verifyManualToken } from '../services/socialAuth';
@@ -46,8 +49,10 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
   const icons = {
     [Platform.FACEBOOK]: <Facebook size={24} />,
     [Platform.INSTAGRAM]: <Instagram size={24} />,
-    [Platform.X]: <Twitter size={24} />, // Twitter icon for X
+    [Platform.X]: <Twitter size={24} />,
     [Platform.LINKEDIN]: <Linkedin size={24} />,
+    [Platform.YOUTUBE]: <Youtube size={24} />,
+    [Platform.TIKTOK]: <Music size={24} />, // Alternative for TikTok
   };
 
   const colors = {
@@ -55,6 +60,8 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
     [Platform.INSTAGRAM]: 'bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]',
     [Platform.X]: 'bg-[#000000]',
     [Platform.LINKEDIN]: 'bg-[#0077B5]',
+    [Platform.YOUTUBE]: 'bg-[#FF0000]',
+    [Platform.TIKTOK]: 'bg-[#000000] border-2 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]',
   };
 
   const handleConnect = async () => {
@@ -73,24 +80,18 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
     if (platform === Platform.X) {
       setClientId('RElQcy04RnduZUlWQVdadTVKLWs6MTpjaQ');
       setClientSecret('6J16Bv9WxCReKQ3sVhCz4I2irNX-boQ5hv_TAMDteVf8GUm7KV');
-    } else if (platform === Platform.FACEBOOK || platform === Platform.INSTAGRAM) {
-      setClientId('782910394857261');
-      setClientSecret('8f2a7b9c1d4e5f6a0b1c2d3e4f5a6b7c');
+    } else {
+      setClientId('enterprise-id-demo-99');
+      setClientSecret('secret-hash-demo-12345');
     }
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     setIsConnecting(true);
     setError(null);
     try {
-      const conn = await verifyManualToken(
-        platform, 
-        manualToken, 
-        clientId, 
-        clientSecret
-      );
+      const conn = await verifyManualToken(platform, manualToken, clientId, clientSecret);
       onManualConnect(conn);
       setManualToken('');
       setClientId('');
@@ -103,178 +104,82 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
     }
   };
 
-  const needsAppCredentials = [Platform.X, Platform.FACEBOOK, Platform.INSTAGRAM].includes(platform);
+  const needsAppCredentials = true;
 
   return (
     <div className={`relative overflow-hidden bg-white p-6 lg:p-8 rounded-[2.5rem] border-2 transition-all duration-500 ${connection.isConnected ? 'border-emerald-100 shadow-xl shadow-emerald-50/50' : error ? 'border-red-100 shadow-lg shadow-red-50/30' : 'border-slate-100 hover:border-slate-200 shadow-sm'}`}>
       <div className="flex items-start justify-between mb-8">
-        <div className={`w-16 h-16 rounded-[1.5rem] ${colors[platform]} flex items-center justify-center text-white shadow-2xl transition-transform hover:rotate-3 shrink-0`}>
+        <div className={`w-14 h-14 rounded-[1.25rem] ${colors[platform]} flex items-center justify-center text-white shadow-2xl transition-transform hover:rotate-3 shrink-0`}>
           {icons[platform]}
         </div>
         {connection.isConnected ? (
           <div className="flex flex-col items-end gap-1">
-            <div className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100 flex items-center gap-2 animate-in fade-in zoom-in duration-300">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              Connected
+            <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              Active
             </div>
-            {connection.clientId && (
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Enterprise API</span>
-            )}
-          </div>
-        ) : error ? (
-          <div className="px-4 py-1.5 bg-red-50 text-red-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-100 flex items-center gap-2 animate-bounce">
-            <ShieldAlert size={10} />
-            Connection Error
           </div>
         ) : (
-          <div className="px-4 py-1.5 bg-slate-50 text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-100 flex items-center gap-2">
-            Offline
+          <div className="px-3 py-1 bg-slate-50 text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest border border-slate-100">
+            Pending
           </div>
         )}
       </div>
 
-      <div className="space-y-2 mb-8">
-        <h3 className="text-2xl font-black text-slate-900 tracking-tight">{platform}</h3>
-        <p className="text-sm text-slate-500 font-medium leading-relaxed">
+      <div className="space-y-1 mb-6">
+        <h3 className="text-xl font-black text-slate-900 tracking-tight">{platform}</h3>
+        <p className="text-[11px] text-slate-500 font-bold leading-relaxed line-clamp-2">
           {connection.isConnected 
-            ? `Successfully linked to @${connection.username}. API nodes are active.` 
-            : `Authorize NewsFlow to automate broadcasts directly to your ${platform} audience.`}
+            ? `Verified node for @${connection.username}` 
+            : `Enable automated broadcasting for your ${platform} channel.`}
         </p>
       </div>
 
-      {error && !connection.isConnected && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-          <AlertCircle size={16} className="text-red-500 mt-0.5 shrink-0" />
-          <div className="flex-1">
-            <p className="text-[10px] font-black text-red-700 uppercase tracking-wider mb-1">Diagnostic Report</p>
-            <p className="text-[11px] text-red-600 font-bold leading-tight">{error}</p>
-          </div>
-        </div>
-      )}
-
       {connection.isConnected ? (
-        <div className="space-y-4 animate-in slide-in-from-bottom-2">
-          <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-[1.5rem] border border-slate-100">
-            <div className="relative">
-              <img src={connection.avatar} alt="Profile" className="w-10 h-10 rounded-xl shadow-md border-2 border-white" />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
-                <CheckCircle2 size={8} className="text-white" />
-              </div>
-            </div>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+            <img src={connection.avatar} className="w-8 h-8 rounded-lg shadow-sm" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-black text-slate-900 truncate">{connection.username}</p>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Sync: {connection.lastSync}</p>
+              <p className="text-[10px] font-black text-slate-900 truncate">@{connection.username}</p>
+              <p className="text-[8px] text-slate-400 font-bold uppercase">Token Verified</p>
             </div>
-            <button className="p-2.5 text-slate-300 hover:text-red-600 hover:bg-white rounded-xl transition-all">
-              <RefreshCw size={14} />
-            </button>
           </div>
-          <button 
-            onClick={onDisconnect}
-            className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2 border border-transparent hover:border-red-100"
-          >
-            <Unlink size={14} /> Revoke Access
+          <button onClick={onDisconnect} className="w-full py-3 text-slate-400 font-black text-[9px] uppercase tracking-widest hover:text-red-600 transition-all border border-slate-100 rounded-xl">
+            Disconnect
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <button 
             onClick={handleConnect}
             disabled={isConnecting}
-            className={`w-full py-5 text-white font-black text-xs uppercase tracking-[0.15em] rounded-[1.5rem] transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-70 group ${error ? 'bg-red-600 shadow-red-100' : 'bg-slate-900 shadow-slate-200 hover:bg-black'}`}
+            className="w-full py-4 bg-slate-950 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-2 shadow-lg"
           >
-            {isConnecting && !showAdvanced ? (
-              <Loader2 className="animate-spin" size={18} />
-            ) : (
-              <>
-                {error ? 'Retry OAuth Handshake' : 'Launch Secure OAuth'}
-                <Globe size={16} className="group-hover:rotate-12 transition-transform" />
-              </>
-            )}
+            {isConnecting ? <Loader2 className="animate-spin" size={14} /> : <Zap size={14} />} Connect Hub
           </button>
-
-          <div className="relative">
-            <button 
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 py-2 transition-colors"
-            >
-              {showAdvanced ? 'Hide Advanced Setup' : 'Enter Enterprise Credentials'}
-              <ChevronDown size={12} className={`transition-transform duration-300 ${showAdvanced ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {showAdvanced && (
-              <form onSubmit={handleManualSubmit} className="mt-4 p-5 bg-slate-50 rounded-[1.5rem] border border-slate-200 space-y-4 animate-in slide-in-from-top-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Key size={14} className="text-brand" />
-                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
-                      Developer Portal Keys
-                    </span>
-                  </div>
-                  {needsAppCredentials && (
-                    <button 
-                      type="button" 
-                      onClick={fillDefaultKeys}
-                      className="text-[8px] font-black text-brand bg-brand/5 px-2 py-1 rounded-md uppercase hover:bg-brand/10 transition-colors flex items-center gap-1"
-                    >
-                      <Zap size={8} /> Load Demo Keys
-                    </button>
-                  )}
-                </div>
-                
-                <div className="space-y-3">
-                  {needsAppCredentials && (
-                    <>
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">App ID / Client ID</label>
-                        <input 
-                          type="text" 
-                          placeholder="ID from dev console..."
-                          className={`w-full px-4 py-3 bg-white border ${error ? 'border-red-200' : 'border-slate-200'} rounded-xl text-xs font-bold outline-none focus:border-brand transition-all`}
-                          value={clientId}
-                          onChange={(e) => setClientId(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">App Secret / Client Secret</label>
-                        <input 
-                          type="password" 
-                          placeholder="Secret from dev console..."
-                          className={`w-full px-4 py-3 bg-white border ${error ? 'border-red-200' : 'border-slate-200'} rounded-xl text-xs font-bold outline-none focus:border-brand transition-all`}
-                          value={clientSecret}
-                          onChange={(e) => setClientSecret(e.target.value)}
-                        />
-                      </div>
-                    </>
-                  )}
-                  
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Long-Lived Access Token</label>
-                    <input 
-                      type="password" 
-                      placeholder="Enter permanent API token..."
-                      className={`w-full px-4 py-3 bg-white border ${error ? 'border-red-200' : 'border-slate-200'} rounded-xl text-xs font-bold outline-none focus:border-brand transition-all`}
-                      value={manualToken}
-                      onChange={(e) => setManualToken(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={isConnecting}
-                  className="w-full py-3 bg-white border border-slate-200 text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-950 hover:text-white hover:border-slate-950 transition-all flex items-center justify-center gap-2 shadow-sm"
-                >
-                  {isConnecting ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={14} />}
-                  Handshake & Activate
-                </button>
-                <div className="flex items-center gap-2 justify-center">
-                    <Info size={10} className="text-slate-400" />
-                    <p className="text-[8px] text-slate-400 leading-tight uppercase tracking-tight">Encrypted at rest • Enterprise Mode</p>
-                </div>
-              </form>
-            )}
-          </div>
+          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full text-[9px] font-black text-slate-400 uppercase text-center py-1">
+            {showAdvanced ? 'Simple Mode' : 'Enterprise Credentials'}
+          </button>
+          
+          {showAdvanced && (
+             <form onSubmit={handleManualSubmit} className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <input 
+                   type="text" 
+                   placeholder="Client ID..." 
+                   className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none" 
+                   value={clientId}
+                   onChange={e => setClientId(e.target.value)}
+                />
+                <input 
+                   type="password" 
+                   placeholder="Access Token..." 
+                   className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none" 
+                   value={manualToken}
+                   onChange={e => setManualToken(e.target.value)}
+                />
+                <button type="submit" className="w-full py-2 bg-brand text-white text-[9px] font-black uppercase rounded-lg">Verify Node</button>
+             </form>
+          )}
         </div>
       )}
     </div>

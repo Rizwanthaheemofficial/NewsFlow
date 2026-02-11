@@ -3,7 +3,9 @@ export enum Platform {
   FACEBOOK = 'Facebook',
   INSTAGRAM = 'Instagram',
   X = 'X',
-  LINKEDIN = 'LinkedIn'
+  LINKEDIN = 'LinkedIn',
+  YOUTUBE = 'YouTube',
+  TIKTOK = 'TikTok'
 }
 
 export enum TemplateType {
@@ -33,9 +35,11 @@ export interface AccountConnection {
   avatar?: string;
   lastSync?: string;
   accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: number;
   clientId?: string;
   clientSecret?: string;
-  expiresAt?: number;
+  pageId?: string; // Facebook Page ID, YouTube Channel ID, etc.
 }
 
 export interface WPPost {
@@ -65,6 +69,8 @@ export interface ContentVariations {
   [Platform.INSTAGRAM]: string;
   [Platform.X]: string;
   [Platform.LINKEDIN]: string;
+  [Platform.YOUTUBE]?: string;
+  [Platform.TIKTOK]?: string;
 }
 
 export interface EngagementMetrics {
@@ -111,6 +117,8 @@ export interface AppSettings {
   igConnection: AccountConnection;
   xConnection: AccountConnection;
   liConnection: AccountConnection;
+  ytConnection: AccountConnection;
+  ttConnection: AccountConnection;
   dailyLimit: number;
   autoPublish: boolean;
   autoDetect: boolean;

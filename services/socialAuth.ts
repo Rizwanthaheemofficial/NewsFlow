@@ -3,9 +3,6 @@ import { Platform, AccountConnection } from '../types';
 
 const STORAGE_KEY = 'newsflow_connections';
 
-/**
- * Persists connections to localStorage to make the integration feel "real"
- */
 export const saveConnection = (platform: Platform, connection: AccountConnection) => {
   const existing = getStoredConnections();
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...existing, [platform]: connection }));
@@ -22,10 +19,6 @@ export const clearConnection = (platform: Platform) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
 };
 
-/**
- * PRODUCTION OAUTH CONFIGURATIONS
- * Real authorization endpoints for social media platforms.
- */
 const OAUTH_CONFIGS: Record<string, { authUrl: string; scopes: string; clientId: string }> = {
   [Platform.X]: {
     authUrl: 'https://twitter.com/i/oauth2/authorize',
@@ -46,12 +39,19 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; scopes: string; clientId:
     authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
     scopes: 'w_member_social,r_liteprofile',
     clientId: '77v8x2k9z4v5n6'
+  },
+  [Platform.YOUTUBE]: {
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    scopes: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
+    clientId: '921837465-google-client-id.apps.googleusercontent.com'
+  },
+  [Platform.TIKTOK]: {
+    authUrl: 'https://www.tiktok.com/v2/auth/authorize/',
+    scopes: 'user.info.basic,video.upload,video.publish',
+    clientId: 'tiktok-enterprise-id-123'
   }
 };
 
-/**
- * Handles the redirection to the social media platform login page.
- */
 export const initiateSocialConnection = async (platform: Platform): Promise<void> => {
   const config = OAUTH_CONFIGS[platform];
   if (!config) throw new Error(`OAuth configuration registry mismatch for ${platform}`);
@@ -63,52 +63,71 @@ export const initiateSocialConnection = async (platform: Platform): Promise<void
 
   if (platform === Platform.X) {
     url += '&code_challenge=challenge&code_challenge_method=plain';
+  } else if (platform === Platform.YOUTUBE) {
+    url += '&access_type=offline&prompt=consent'; // Ensure we get a refresh token
   }
 
   localStorage.setItem('oauth_state', state);
   window.location.href = url;
 };
 
-/**
- * Finalizes the connection after the social platform redirects back with a code.
- */
 export const finalizeSocialConnection = async (code: string, state: string): Promise<AccountConnection | null> => {
   try {
     const savedState = localStorage.getItem('oauth_state');
-    if (!savedState) throw new Error('ERR_OAUTH_SESSION_EXPIRED: No originating session found in local storage.');
-    if (state !== savedState) throw new Error('ERR_SECURITY_STATE_MISMATCH: Request origin could not be verified.');
+    if (!savedState) throw new Error('ERR_OAUTH_SESSION_EXPIRED');
+    if (state !== savedState) throw new Error('ERR_SECURITY_STATE_MISMATCH');
     
     const { platform } = JSON.parse(atob(state));
     localStorage.removeItem('oauth_state');
 
-    // Simulate network latency for exchange
     await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Simulate rare random failure for demonstration purposes
-    if (Math.random() < 0.05) {
-      throw new Error(`ERR_API_TIMEOUT: The ${platform} gateway failed to respond within 5000ms.`);
-    }
 
     const mockData: AccountConnection = {
       isConnected: true,
-      username: `${platform}_Newsroom`,
+      username: `${platform}_Official`,
       avatar: `https://ui-avatars.com/api/?name=${platform}&background=random`,
       lastSync: new Date().toLocaleString(),
       accessToken: `live_tok_${Math.random().toString(36).substr(2, 20)}`,
-      expiresAt: Date.now() + (60 * 60 * 24 * 30 * 1000)
+      refreshToken: `ref_tok_${Math.random().toString(36).substr(2, 20)}`,
+      expiresAt: Date.now() + (60 * 60 * 24 * 30 * 1000),
+      pageId: `id_${Math.random().toString(36).substr(2, 8)}`
     };
 
     saveConnection(platform as Platform, mockData);
     return mockData;
   } catch (error: any) {
     console.error('OAuth Finalization Failed:', error);
-    throw error; // Re-throw to be caught by UI
+    throw error;
   }
 };
 
 /**
- * Simulates an API handshake to verify manual credentials.
+ * TOKEN REFRESH LOGIC
+ * In a real app, this calls the backend /refresh endpoint
  */
+export const refreshConnection = async (platform: Platform, connection: AccountConnection): Promise<AccountConnection> => {
+  if (!connection.refreshToken) return connection;
+  
+  // Only refresh if expiring in less than 5 minutes
+  const buffer = 5 * 60 * 1000;
+  if (connection.expiresAt && connection.expiresAt > Date.now() + buffer) {
+    return connection;
+  }
+
+  console.log(`[AUTH] Refreshing token for ${platform}...`);
+  // Simulate API call to token endpoint
+  await new Promise(r => setTimeout(r, 1000));
+  
+  const updated: AccountConnection = {
+    ...connection,
+    accessToken: `refreshed_tok_${Math.random().toString(36).substr(2, 10)}`,
+    expiresAt: Date.now() + (60 * 60 * 1000) // +1 hour
+  };
+  
+  saveConnection(platform, updated);
+  return updated;
+};
+
 export const verifyManualToken = async (
   platform: Platform, 
   token: string, 
@@ -117,36 +136,15 @@ export const verifyManualToken = async (
 ): Promise<AccountConnection> => {
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // Strict Validation logic for platforms requiring App Credentials
-  if ([Platform.X, Platform.FACEBOOK, Platform.INSTAGRAM].includes(platform)) {
-    if (!clientId) {
-      throw new Error(`ERR_MISSING_CLIENT_ID: ${platform} Enterprise mode requires a valid Client ID from the developer portal.`);
-    }
-    if (!clientSecret) {
-      throw new Error(`ERR_MISSING_CLIENT_SECRET: ${platform} Enterprise mode requires a valid Client Secret for HMAC signing.`);
-    }
-    
-    // Simulate credential validation
-    if (clientId.length < 5) {
-      throw new Error(`ERR_INVALID_CLIENT_ID: The provided ID is too short to be a valid ${platform} identifier.`);
-    }
-  }
-
-  if (!token) {
-    throw new Error('ERR_EMPTY_TOKEN: Access token field cannot be empty for manual handshake.');
-  }
-
-  // Simulate a token validity check
-  if (token.toLowerCase() === 'error' || token.toLowerCase() === 'fail') {
-    throw new Error(`ERR_TOKEN_INVALID: The ${platform} API rejected the provided bearer token (Invalid Signature).`);
-  }
+  if (!token) throw new Error('ERR_EMPTY_TOKEN');
 
   const mockData: AccountConnection = {
     isConnected: true,
-    username: clientId ? `${platform}_Enterprise_Node` : `${platform}_Service_Bot`,
+    username: clientId ? `${platform}_Enterprise` : `${platform}_Bot`,
     avatar: `https://ui-avatars.com/api/?name=${platform}&background=random`,
     lastSync: new Date().toLocaleString(),
-    accessToken: token || `manual_${platform}_${Math.random().toString(36).substr(2, 9)}`,
+    accessToken: token,
+    refreshToken: `manual_ref_${platform}`,
     clientId,
     clientSecret,
     expiresAt: Date.now() + (365 * 24 * 60 * 60 * 1000)
