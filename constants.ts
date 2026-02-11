@@ -33,7 +33,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateType, any> = {
     barColor: '#1e293b',
     defaultLogo: APP_LOGO_BASE64,
     overlayOpacity: 0.2,
-    logoFilter: 'brightness(0) invert(1)' // Mechanism: Forces any logo to pure white for dark theme
+    logoFilter: 'brightness(0) invert(1)'
   },
   [TemplateType.MODERN_NEWS]: {
     backgroundColor: '#ffffff',
@@ -42,6 +42,15 @@ export const TEMPLATE_CONFIGS: Record<TemplateType, any> = {
     barColor: '#111827',
     defaultLogo: APP_LOGO_BASE64,
     overlayOpacity: 1.0,
+    logoFilter: 'none'
+  },
+  [TemplateType.ARY_STYLE]: {
+    backgroundColor: '#ffffff',
+    textColor: '#1a1a1a',
+    accentColor: '#e11d48',
+    barColor: '#000000',
+    defaultLogo: APP_LOGO_BASE64,
+    overlayOpacity: 0,
     logoFilter: 'none'
   }
 };
@@ -58,7 +67,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dailyLimit: 20,
   autoPublish: false,
   autoDetect: true,
-  selectedTemplate: TemplateType.MODERN_NEWS,
+  selectedTemplate: TemplateType.ARY_STYLE, // Default to new style
   imageSource: ImageSource.WORDPRESS,
   logoUrl: '',
   aiConfig: {
@@ -70,7 +79,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     targetLanguage: 'English'
   },
   branding: {
-    primaryColor: '#cc0000',
+    primaryColor: '#e11d48',
     accentColor: '#1a1a1a',
     useCustomColors: false
   },

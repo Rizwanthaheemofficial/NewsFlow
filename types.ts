@@ -10,7 +10,8 @@ export enum TemplateType {
   BREAKING_NEWS = 'Breaking News',
   STANDARD = 'Standard News',
   MINIMALIST = 'Minimalist',
-  MODERN_NEWS = 'Modern News'
+  MODERN_NEWS = 'Modern News',
+  ARY_STYLE = 'ARY Style'
 }
 
 export enum ImageSource {

@@ -73,11 +73,112 @@ const drawWrappedText = (
 };
 
 /**
+ * HELPER: Calculates the font size required to fit text within a box
+ */
+const getOptimalFontSize = (
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxHeight: number,
+  maxFontSize: number
+) => {
+  let fontSize = maxFontSize;
+  let lines: string[] = [];
+  
+  while (fontSize > 32) {
+    ctx.font = `900 ${fontSize}px Inter`;
+    const words = text.split(' ');
+    lines = [];
+    let currentLine = '';
+
+    for (let n = 0; n < words.length; n++) {
+      const testLine = currentLine + words[n] + ' ';
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && n > 0) {
+        lines.push(currentLine.trim());
+        currentLine = words[n] + ' ';
+      } else {
+        currentLine = testLine;
+      }
+    }
+    lines.push(currentLine.trim());
+
+    const totalHeight = lines.length * (fontSize * 1.2);
+    if (totalHeight <= maxHeight) break;
+    fontSize -= 2;
+  }
+  
+  return { fontSize, lines };
+};
+
+/**
  * TEMPLATE DRIVERS: Modular rendering strategies for each template type
  */
 const TEMPLATE_DRIVERS: Record<TemplateType, (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, config: any, data: { headline: string, handle: string, highlights: string[] }) => void> = {
+  [TemplateType.ARY_STYLE]: (ctx, canvas, config, { headline, handle, highlights }) => {
+    // 1. Background Red Accents (Peaking stripes)
+    ctx.fillStyle = config.accentColor;
+    ctx.save();
+    ctx.translate(0, canvas.height - 430);
+    ctx.rotate(-Math.PI / 16);
+    ctx.fillRect(-150, 0, 400, 70);
+    ctx.restore();
+    
+    ctx.save();
+    ctx.translate(canvas.width, canvas.height - 380);
+    ctx.rotate(-Math.PI / 16);
+    ctx.fillRect(-250, 0, 400, 70);
+    ctx.restore();
+
+    // 2. Footer Bar
+    ctx.fillStyle = '#111111';
+    ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+    
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 28px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText(handle.toLowerCase(), canvas.width / 2, canvas.height - 45);
+
+    // 3. White Box Dimensions
+    const boxW = canvas.width * 0.85;
+    const boxH = 340;
+    const boxX = (canvas.width - boxW) / 2;
+    const boxY = canvas.height - 490;
+    
+    const r = 35;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.15)';
+    ctx.shadowBlur = 40;
+    ctx.beginPath();
+    ctx.moveTo(boxX + r, boxY);
+    ctx.lineTo(boxX + boxW - r, boxY);
+    ctx.quadraticCurveTo(boxX + boxW, boxY, boxX + boxW, boxY + r);
+    ctx.lineTo(boxX + boxW, boxY + boxH - r);
+    ctx.quadraticCurveTo(boxX + boxW, boxY + boxH, boxX + boxW - r, boxY + boxH);
+    ctx.lineTo(boxX + r, boxY + boxH);
+    ctx.quadraticCurveTo(boxX, boxY + boxH, boxX, boxY + boxH - r);
+    ctx.lineTo(boxX, boxY + r);
+    ctx.quadraticCurveTo(boxX, boxY, boxX + r, boxY);
+    ctx.closePath();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.restore();
+
+    // 4. Auto-Resizing Headline Logic
+    const padding = 60;
+    const maxTxtW = boxW - (padding * 2);
+    const maxTxtH = boxH - (padding * 1.2);
+    
+    const { fontSize, lines } = getOptimalFontSize(ctx, headline, maxTxtW, maxTxtH, 72);
+    
+    // Vertical centering calculation
+    const totalTextHeight = lines.length * (fontSize * 1.2);
+    const startY = boxY + ((boxH - totalTextHeight) / 2) + (fontSize * 0.8);
+
+    drawWrappedText(ctx, headline, canvas.width / 2, startY, maxTxtW, fontSize, 'center', highlights, config.accentColor, '#000000');
+  },
+
   [TemplateType.MODERN_NEWS]: (ctx, canvas, config, { headline, handle, highlights }) => {
-    // 1. Specialized Gradient for Modern Light/Dark contrast
     const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
     grad.addColorStop(0, 'rgba(0,0,0,0.4)');
     grad.addColorStop(0.3, 'rgba(0,0,0,0)');
@@ -86,7 +187,6 @@ const TEMPLATE_DRIVERS: Record<TemplateType, (ctx: CanvasRenderingContext2D, can
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 2. Graphics
     ctx.fillStyle = config.barColor;
     ctx.fillRect(0, canvas.height - 110, canvas.width, 110);
     drawWrappedText(ctx, headline, canvas.width / 2, canvas.height - 400, canvas.width - 120, 64, 'center', highlights, config.accentColor, '#111827');
