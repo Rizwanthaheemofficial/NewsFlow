@@ -11,7 +11,10 @@ import {
   Search,
   ChevronRight,
   Menu,
-  X
+  X,
+  Scale,
+  FileText,
+  Trash2
 } from 'lucide-react';
 import { APP_LOGO_BASE64 } from '../constants';
 
@@ -30,6 +33,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
     { id: 'history', icon: History, label: 'Audit Logs' },
     { id: 'settings', icon: Settings, label: 'Integrations' },
     { id: 'account', icon: UserCircle, label: 'My Cloud' },
+  ];
+
+  const complianceItems = [
+    { id: 'privacy', icon: ShieldCheck, label: 'Privacy Policy' },
+    { id: 'terms', icon: FileText, label: 'Terms of Service' },
+    { id: 'data-deletion', icon: Trash2, label: 'Data Deletion' },
   ];
 
   const handleTabChange = (id: string) => {
@@ -80,23 +89,46 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         </div>
 
         <nav className="flex-1 mt-6 px-6 space-y-2 relative overflow-y-auto custom-scrollbar">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleTabChange(item.id)}
-              className={`w-full flex items-center justify-between px-5 py-4 rounded-[1.5rem] transition-all group ${
-                activeTab === item.id 
-                  ? 'bg-brand text-white shadow-brand scale-[1.02]' 
-                  : 'text-slate-500 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <item.icon size={20} className={activeTab === item.id ? 'text-white' : 'text-slate-600 group-hover:text-brand transition-colors'} />
-                <span className="font-black text-sm tracking-tight">{item.label}</span>
-              </div>
-              {activeTab === item.id && <ChevronRight size={14} className="opacity-50" />}
-            </button>
-          ))}
+          <div className="pb-4">
+            <p className="px-5 text-[9px] font-black text-slate-600 uppercase tracking-widest mb-3">Main Console</p>
+            {menuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleTabChange(item.id)}
+                className={`w-full flex items-center justify-between px-5 py-3.5 rounded-[1.25rem] transition-all group ${
+                  activeTab === item.id 
+                    ? 'bg-brand text-white shadow-brand scale-[1.02]' 
+                    : 'text-slate-500 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <item.icon size={18} className={activeTab === item.id ? 'text-white' : 'text-slate-600 group-hover:text-brand transition-colors'} />
+                  <span className="font-black text-sm tracking-tight">{item.label}</span>
+                </div>
+                {activeTab === item.id && <ChevronRight size={14} className="opacity-50" />}
+              </button>
+            ))}
+          </div>
+
+          <div className="pt-4 border-t border-slate-900/50">
+            <p className="px-5 text-[9px] font-black text-slate-600 uppercase tracking-widest mb-3">Compliance</p>
+            {complianceItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleTabChange(item.id)}
+                className={`w-full flex items-center justify-between px-5 py-3 rounded-[1.25rem] transition-all group ${
+                  activeTab === item.id 
+                    ? 'bg-slate-800 text-white border border-slate-700' 
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <item.icon size={16} className={activeTab === item.id ? 'text-brand' : 'text-slate-700 group-hover:text-slate-400'} />
+                  <span className="font-bold text-xs">{item.label}</span>
+                </div>
+              </button>
+            ))}
+          </div>
         </nav>
 
         <div className="p-8 relative mt-auto">

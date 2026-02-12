@@ -60,7 +60,13 @@ import {
   ImageIcon,
   ThumbsUp,
   MessageSquare,
-  BarChart3
+  BarChart3,
+  Scale,
+  FileText,
+  ShieldAlert,
+  // Added Info and ArrowRight icons to fix missing import errors
+  Info,
+  ArrowRight
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -403,6 +409,127 @@ const App: React.FC = () => {
                         onManualConnect={(conn) => handleManualConnectionUpdate(p, conn)}
                       />
                     ))}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {activeTab === 'privacy' && (
+        <div className="max-w-4xl mx-auto bg-white p-12 rounded-[3rem] shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-8">
+           <div className="flex items-center gap-6 mb-12">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center shadow-inner"><ShieldCheck size={32} /></div>
+              <div>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Privacy Policy</h1>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Last Updated: October 2024</p>
+              </div>
+           </div>
+           <div className="prose prose-slate max-w-none space-y-8 text-slate-600 font-medium leading-relaxed">
+              <section className="space-y-4">
+                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
+                   <div className="w-1.5 h-6 bg-brand rounded-full"></div> 1. Information We Collect
+                 </h2>
+                 <p>NewsFlow Pro collects information you provide directly, such as when you link social media accounts via OAuth 2.0. This includes access tokens, page identifiers, and channel metadata required to automate content distribution. We also process public data from your configured WordPress feeds.</p>
+              </section>
+              <section className="space-y-4">
+                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
+                   <div className="w-1.5 h-6 bg-brand rounded-full"></div> 2. Use of Third-Party APIs
+                 </h2>
+                 <p>Our platform interacts with Meta (Facebook/Instagram), Google (YouTube), TikTok, and LinkedIn APIs. Your data is used exclusively to facilitate content broadcasting at your request. We do not sell or share your access tokens with third-party advertisers.</p>
+              </section>
+              <section className="space-y-4">
+                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
+                   <div className="w-1.5 h-6 bg-brand rounded-full"></div> 3. AI Data Processing
+                 </h2>
+                 <p>We utilize the Google Gemini API for content generation. While prompts (news excerpts) are sent to Gemini for processing, your private OAuth credentials are never shared with AI models. Data processing is ephemeral and aimed solely at optimizing your social reach.</p>
+              </section>
+              <section className="space-y-4 bg-slate-50 p-8 rounded-[2rem] border border-slate-100">
+                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">GDPR & CCPA Compliance</p>
+                 <p>Users have the right to request access, correction, or deletion of their personal information. To exercise these rights, please visit our Data Deletion page or contact support@newsflow.live.</p>
+              </section>
+           </div>
+        </div>
+      )}
+
+      {activeTab === 'terms' && (
+        <div className="max-w-4xl mx-auto bg-white p-12 rounded-[3rem] shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-8">
+           <div className="flex items-center gap-6 mb-12">
+              <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center shadow-inner"><FileText size={32} /></div>
+              <div>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Terms of Service</h1>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Version 2.4 Enterprise</p>
+              </div>
+           </div>
+           <div className="prose prose-slate max-w-none space-y-8 text-slate-600 font-medium leading-relaxed">
+              <section className="space-y-4">
+                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
+                   <div className="w-1.5 h-6 bg-brand rounded-full"></div> 1. Acceptance of Terms
+                 </h2>
+                 <p>By accessing NewsFlow Pro, you agree to comply with these terms and all applicable laws regarding social media automation and AI usage.</p>
+              </section>
+              <section className="space-y-4">
+                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
+                   <div className="w-1.5 h-6 bg-brand rounded-full"></div> 2. Responsible AI Usage
+                 </h2>
+                 <p>You are solely responsible for all content generated using our AI tools. Content must not violate third-party intellectual property, privacy rights, or platform guidelines regarding misinformation or hate speech.</p>
+              </section>
+              <section className="space-y-4">
+                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
+                   <div className="w-1.5 h-6 bg-brand rounded-full"></div> 3. Subscription & Billing
+                 </h2>
+                 <p>Services are billed according to your selected plan (Basic, Pro, or Enterprise). Failure to maintain valid payment methods may result in immediate suspension of broadcast nodes.</p>
+              </section>
+              <div className="flex items-center gap-3 p-6 bg-blue-50 text-blue-700 rounded-2xl border border-blue-100 text-xs font-bold leading-snug">
+                 <Info size={18} className="shrink-0" />
+                 <span>Usage limits (daily posts and API tokens) are strictly enforced to ensure platform stability for all enterprise nodes.</span>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {activeTab === 'data-deletion' && (
+        <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-8">
+           <div className="bg-white p-12 rounded-[3rem] shadow-sm border border-slate-100 mb-8">
+              <div className="flex items-center gap-6 mb-12">
+                 <div className="w-16 h-16 bg-red-50 text-red-600 rounded-3xl flex items-center justify-center shadow-inner"><Trash2 size={32} /></div>
+                 <div>
+                   <h1 className="text-3xl font-black text-slate-900 tracking-tight">Data Deletion</h1>
+                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Automated Privacy Control</p>
+                 </div>
+              </div>
+              
+              <div className="space-y-10">
+                 <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 space-y-4">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                       <ShieldAlert className="text-red-500" size={16} /> Data Portability & Removal
+                    </h3>
+                    <p className="text-sm text-slate-500 font-medium">In accordance with Meta's Data Deletion Policy and GDPR, we provide tools to fully purge your information from our systems. Deletion is permanent and cannot be undone.</p>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="p-8 border-2 border-slate-100 rounded-[2rem] hover:border-brand/20 transition-all space-y-4">
+                       <h4 className="text-xs font-black uppercase tracking-widest text-slate-900">Step 1: Revoke Access</h4>
+                       <p className="text-[11px] text-slate-500 font-bold leading-relaxed">Go to your Integrated Apps settings on Facebook, X, or Google and remove "NewsFlow Pro" as an authorized application. This stops further data ingest.</p>
+                       <button onClick={() => setActiveTab('settings')} className="flex items-center gap-2 text-[10px] font-black text-brand uppercase tracking-widest hover:translate-x-1 transition-transform">
+                          Go to Integrations <ArrowRight size={14} />
+                       </button>
+                    </div>
+                    <div className="p-8 border-2 border-slate-100 rounded-[2rem] hover:border-red-100 transition-all space-y-4">
+                       <h4 className="text-xs font-black uppercase tracking-widest text-slate-900">Step 2: Wipe Local Store</h4>
+                       <p className="text-[11px] text-slate-500 font-bold leading-relaxed">Click below to immediately clear all OAuth tokens, settings, and logs stored in your current browser session.</p>
+                       <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="px-6 py-3 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-red-100 hover:bg-red-700 transition-all">
+                          Wipe Session Cache
+                       </button>
+                    </div>
+                 </div>
+
+                 <div className="pt-8 border-t border-slate-100">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 mb-6 text-center">Contact For Full Server Purge</h4>
+                    <div className="max-w-md mx-auto p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 text-center space-y-4">
+                       <Mail className="mx-auto text-slate-400" size={32} />
+                       <p className="text-sm font-bold text-slate-900">compliance@newsflow.live</p>
+                       <p className="text-[10px] text-slate-500 font-medium">Send a request with your Work Email to trigger a full database wipe of your organization data.</p>
+                    </div>
                  </div>
               </div>
            </div>
