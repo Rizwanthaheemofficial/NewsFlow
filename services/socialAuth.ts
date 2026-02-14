@@ -19,7 +19,7 @@ export const clearConnection = (platform: Platform) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
 };
 
-const OAUTH_CONFIGS: Record<string, { authUrl: string; scopes: string; clientId: string }> = {
+const OAUTH_CONFIGS: Record<string, { authUrl: string; scopes: string; clientId: string; clientSecret?: string }> = {
   [Platform.X]: {
     authUrl: 'https://twitter.com/i/oauth2/authorize',
     scopes: 'tweet.read tweet.write users.read offline.access',
@@ -28,12 +28,14 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; scopes: string; clientId:
   [Platform.FACEBOOK]: {
     authUrl: 'https://www.facebook.com/v12.0/dialog/oauth',
     scopes: 'pages_manage_posts,pages_read_engagement,public_profile',
-    clientId: '782910394857261'
+    clientId: '1308350291052105',
+    clientSecret: '4aaa40900e5cc904cd6f4068d9a0f070'
   },
   [Platform.INSTAGRAM]: {
     authUrl: 'https://www.facebook.com/v12.0/dialog/oauth',
     scopes: 'instagram_basic,instagram_content_publish,pages_show_list',
-    clientId: '782910394857261'
+    clientId: '1308350291052105',
+    clientSecret: '4aaa40900e5cc904cd6f4068d9a0f070'
   },
   [Platform.LINKEDIN]: {
     authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
@@ -82,6 +84,8 @@ export const finalizeSocialConnection = async (code: string, state: string): Pro
 
     await new Promise(resolve => setTimeout(resolve, 1500));
 
+    const config = OAUTH_CONFIGS[platform as Platform];
+
     const mockData: AccountConnection = {
       isConnected: true,
       username: `${platform}_Official`,
@@ -90,7 +94,9 @@ export const finalizeSocialConnection = async (code: string, state: string): Pro
       accessToken: `live_tok_${Math.random().toString(36).substr(2, 20)}`,
       refreshToken: `ref_tok_${Math.random().toString(36).substr(2, 20)}`,
       expiresAt: Date.now() + (60 * 60 * 24 * 30 * 1000),
-      pageId: `id_${Math.random().toString(36).substr(2, 8)}`
+      pageId: `id_${Math.random().toString(36).substr(2, 8)}`,
+      clientId: config?.clientId,
+      clientSecret: config?.clientSecret
     };
 
     saveConnection(platform as Platform, mockData);
