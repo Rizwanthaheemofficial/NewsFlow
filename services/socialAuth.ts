@@ -40,7 +40,7 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; scopes: string; clientId:
   [Platform.LINKEDIN]: {
     authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
     scopes: 'w_member_social,r_liteprofile',
-    clientId: '77v8x2k9z4v5n6'
+    clientId: '775gx1js44v3lv'
   },
   [Platform.YOUTUBE]: {
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
